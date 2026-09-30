@@ -137,10 +137,6 @@ tbody tr:hover { background: #f5fbfd; }
 
 /* Form */
 .form { max-width: 760px; }
-.dropzone { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px; border: 2px dashed #bcd; border-radius: var(--radius); color: var(--muted); cursor: pointer; font-weight: 400; background: #fafcfd; }
-.dropzone:hover { border-color: var(--primary); color: var(--primary-dark); }
-.dropzone b { color: var(--blue); }
-.files { margin: 4px 0 0; padding-left: 18px; font-weight: 400; }
 
 /* Detail */
 .back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; }
@@ -183,3 +179,10 @@ tbody tr:hover { background: #f5fbfd; }
   .grid.kpis { grid-template-columns: 1fr 1fr; }
   .filters select { width: 100%; }
 }
+
+.user-info { display: flex; flex-direction: column; line-height: 1.2; }
+.user-info small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.error { color: #e5322d; font-weight: 600; }
+.demo { font-size: 12px; }
+select:disabled { background: #f4f6f9; cursor: not-allowed; }
+.btn:disabled { opacity: 0.6; cursor: default; }

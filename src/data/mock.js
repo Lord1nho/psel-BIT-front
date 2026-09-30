@@ -14,9 +14,16 @@ export const PRIORITY = {
 
 export const CATEGORIES = ['TI / Suporte', 'Infraestrutura', 'RH', 'Financeiro', 'Compras', 'Facilities']
 
-export const USERS = ['Ana Souza', 'Bruno Lima', 'Carla Mendes', 'Diego Alves', 'Elisa Rocha']
+export const ROLES = { solicitante: 'Solicitante', atendente: 'Atendente' }
 
-export const CURRENT_USER = 'Luiz Fernando'
+export const AGENTS = ['Ana Souza', 'Bruno Lima', 'Carla Mendes', 'Diego Alves', 'Elisa Rocha']
+
+export const MOCK_USERS = [
+  { name: 'Luiz Fernando', email: 'solicitante@bit.com', role: 'solicitante' },
+  { name: 'Ana Souza', email: 'atendente@bit.com', role: 'atendente' },
+]
+
+const CURRENT_USER = 'Luiz Fernando'
 
 const d = (days) => new Date(Date.now() - days * 86400000).toISOString()
 

@@ -1,15 +1,17 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Ticket, PlusCircle, Bell, Search, LogOut, Menu, CheckCircle2 } from 'lucide-react'
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { LayoutDashboard, Ticket, PlusCircle, Bell, Search, LogOut, Menu, CheckCircle2, ArrowLeft } from 'lucide-react'
 import { useApp } from '../context'
-import { CURRENT_USER } from '../data/mock'
+import { ROLES } from '../data/mock'
 import { Avatar } from './Shared'
 
 export default function Layout() {
-  const { logout, toast } = useApp()
+  const { logout, toast, user, loading } = useApp()
   const [open, setOpen] = useState(false)
   const [menu, setMenu] = useState(false)
   const nav = useNavigate()
+  const { key } = useLocation()
+  const canGoBack = key !== 'default'
   const link = ({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')
 
   return (
@@ -42,6 +44,9 @@ export default function Layout() {
           <button className="icon-btn menu-btn" onClick={() => setOpen(true)} aria-label="Menu">
             <Menu size={20} />
           </button>
+          <button className="icon-btn" onClick={() => nav(-1)} disabled={!canGoBack} aria-label="Voltar" title="Voltar">
+            <ArrowLeft size={20} />
+          </button>
           <label className="search">
             <Search size={16} />
             <input placeholder="Buscar solicitações..." onKeyDown={(e) => e.key === 'Enter' && nav('/solicitacoes')} />
@@ -55,8 +60,11 @@ export default function Layout() {
             <i className="ping" />
           </button>
           <div className="user" onClick={() => setMenu(!menu)}>
-            <Avatar name={CURRENT_USER} />
-            <span className="hide-sm">{CURRENT_USER}</span>
+            <Avatar name={user.name} />
+            <span className="hide-sm user-info">
+              {user.name}
+              <small>{ROLES[user.role]}</small>
+            </span>
             {menu && (
               <div className="dropdown">
                 <button onClick={logout}>
@@ -67,7 +75,7 @@ export default function Layout() {
           </div>
         </header>
         <main className="content">
-          <Outlet />
+          {loading ? <p className="muted">Carregando...</p> : <Outlet />}
         </main>
       </div>
 

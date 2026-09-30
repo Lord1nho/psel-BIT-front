@@ -1,14 +1,23 @@
 import { useState } from 'react'
-import { Mail, Lock, User, Ticket, Clock, BarChart3 } from 'lucide-react'
+import { Mail, Lock, Ticket, Clock, BarChart3 } from 'lucide-react'
 import { useApp } from '../context'
 
 export default function Login() {
   const { login } = useApp()
-  const [register, setRegister] = useState(false)
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
-    login()
+    setBusy(true)
+    setError('')
+    try {
+      await login({ email })
+    } catch (err) {
+      setError(err.message)
+      setBusy(false)
+    }
   }
 
   return (
@@ -35,23 +44,14 @@ export default function Login() {
 
       <section className="auth-form">
         <form onSubmit={submit} className="card auth-card">
-          <h2>{register ? 'Criar conta' : 'Bem-vindo de volta'}</h2>
-          <p className="muted">{register ? 'Preencha os dados para se cadastrar.' : 'Entre com suas credenciais corporativas.'}</p>
+          <h2>Bem-vindo de volta</h2>
+          <p className="muted">Entre com suas credenciais corporativas.</p>
 
-          {register && (
-            <label className="field">
-              Nome completo
-              <span className="input-icon">
-                <User size={16} />
-                <input required placeholder="Seu nome" />
-              </span>
-            </label>
-          )}
           <label className="field">
             E-mail
             <span className="input-icon">
               <Mail size={16} />
-              <input type="email" required placeholder="voce@empresa.com" />
+              <input type="email" required placeholder="voce@empresa.com" value={email} onChange={(e) => setEmail(e.target.value)} />
             </span>
           </label>
           <label className="field">
@@ -62,29 +62,13 @@ export default function Login() {
             </span>
           </label>
 
-          {!register && (
-            <div className="row between">
-              <label className="check">
-                <input type="checkbox" defaultChecked /> Lembrar-me
-              </label>
-              <a href="#" onClick={(e) => e.preventDefault()}>
-                Esqueci a senha
-              </a>
-            </div>
-          )}
-
-          <button className="btn primary block">{register ? 'Cadastrar' : 'Entrar'}</button>
-          <p className="muted center">
-            {register ? 'Já tem conta?' : 'Ainda não tem conta?'}{' '}
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault()
-                setRegister(!register)
-              }}
-            >
-              {register ? 'Entrar' : 'Cadastre-se'}
-            </a>
+          {error && <p className="error">{error}</p>}
+          <button className="btn primary block" disabled={busy}>
+            {busy ? 'Entrando...' : 'Entrar'}
+          </button>
+          <p className="muted center demo">
+            Protótipo — use <a href="#" onClick={(e) => { e.preventDefault(); setEmail('solicitante@bit.com') }}>solicitante@bit.com</a> ou{' '}
+            <a href="#" onClick={(e) => { e.preventDefault(); setEmail('atendente@bit.com') }}>atendente@bit.com</a> (qualquer senha)
           </p>
         </form>
       </section>

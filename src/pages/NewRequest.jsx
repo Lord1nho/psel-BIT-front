@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { UploadCloud } from 'lucide-react'
 import { useApp } from '../context'
 import { CATEGORIES, PRIORITY } from '../data/mock'
 
@@ -8,12 +7,11 @@ export default function NewRequest() {
   const { addRequest } = useApp()
   const nav = useNavigate()
   const [f, setF] = useState({ title: '', category: CATEGORIES[0], priority: 'media', description: '' })
-  const [files, setFiles] = useState([])
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
-    const id = addRequest(f)
+    const id = await addRequest(f)
     nav(`/solicitacoes/${id}`)
   }
 
@@ -53,15 +51,6 @@ export default function NewRequest() {
           Descrição *
           <textarea required rows={6} placeholder="Inclua detalhes, passos para reproduzir e impacto no trabalho" value={f.description} onChange={set('description')} />
         </label>
-        <div className="field">
-          Anexos
-          <label className="dropzone">
-            <UploadCloud size={28} />
-            <span>Arraste arquivos ou <b>clique para selecionar</b></span>
-            <input type="file" multiple hidden onChange={(e) => setFiles([...e.target.files].map((x) => x.name))} />
-          </label>
-          {files.length > 0 && <ul className="files">{files.map((n) => <li key={n}>{n}</li>)}</ul>}
-        </div>
         <div className="row end">
           <button type="button" className="btn ghost" onClick={() => nav(-1)}>Cancelar</button>
           <button className="btn primary">Enviar solicitação</button>

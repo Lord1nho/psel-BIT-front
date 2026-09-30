@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, MessageSquare, Circle, Clock } from 'lucide-react'
 import { useApp } from '../context'
-import { STATUS, PRIORITY, USERS } from '../data/mock'
+import { STATUS, PRIORITY } from '../data/mock'
 import { fmtId, fmtDate, StatusBadge, PriorityBadge, Avatar } from '../components/Shared'
 
 export default function RequestDetail() {
   const { id } = useParams()
-  const { requests, updateRequest, addComment, notify } = useApp()
+  const { requests, updateRequest, addComment, notify, isAgent, agents } = useApp()
   const [text, setText] = useState('')
   const r = requests.find((x) => x.id === Number(id))
 
@@ -19,16 +19,17 @@ export default function RequestDetail() {
       </div>
     )
 
-  const change = (field, label, value, display) => {
-    updateRequest(r.id, { [field]: value || null }, `alterou ${label} para "${display}"`)
+  const change = async (field, label, value, display) => {
+    await updateRequest(r.id, { [field]: value || null }, `alterou ${label} para "${display}"`)
     notify('Solicitação atualizada')
   }
 
-  const send = (e) => {
+  const send = async (e) => {
     e.preventDefault()
     if (!text.trim()) return
-    addComment(r.id, text)
+    const t = text
     setText('')
+    await addComment(r.id, t)
   }
 
   return (
@@ -78,24 +79,24 @@ export default function RequestDetail() {
         </div>
 
         <aside className="card side">
-          <h3>Gerenciar</h3>
+          <h3>{isAgent ? 'Gerenciar' : 'Detalhes'}</h3>
           <label className="field">
             Status
-            <select value={r.status} onChange={(e) => change('status', 'o status', e.target.value, STATUS[e.target.value].label)}>
+            <select disabled={!isAgent} value={r.status} onChange={(e) => change('status', 'o status', e.target.value, STATUS[e.target.value].label)}>
               {Object.entries(STATUS).map(([k, s]) => <option key={k} value={k}>{s.label}</option>)}
             </select>
           </label>
           <label className="field">
             Prioridade
-            <select value={r.priority} onChange={(e) => change('priority', 'a prioridade', e.target.value, PRIORITY[e.target.value].label)}>
+            <select disabled={!isAgent} value={r.priority} onChange={(e) => change('priority', 'a prioridade', e.target.value, PRIORITY[e.target.value].label)}>
               {Object.entries(PRIORITY).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}
             </select>
           </label>
           <label className="field">
             Responsável
-            <select value={r.assignee || ''} onChange={(e) => change('assignee', 'o responsável', e.target.value, e.target.value || 'ninguém')}>
+            <select disabled={!isAgent} value={r.assignee || ''} onChange={(e) => change('assignee', 'o responsável', e.target.value, e.target.value || 'ninguém')}>
               <option value="">Não atribuída</option>
-              {USERS.map((u) => <option key={u}>{u}</option>)}
+              {agents.map((u) => <option key={u}>{u}</option>)}
             </select>
           </label>
           <hr />

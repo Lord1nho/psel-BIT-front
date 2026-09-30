@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Search, PlusCircle, ChevronLeft, ChevronRight, Inbox, ArrowUpDown } from 'lucide-react'
 import { useApp } from '../context'
-import { STATUS, PRIORITY, CATEGORIES, CURRENT_USER } from '../data/mock'
+import { STATUS, PRIORITY, CATEGORIES } from '../data/mock'
 import { fmtId, fmtDate, StatusBadge, PriorityBadge, Avatar } from '../components/Shared'
 
 const PER_PAGE = 8
 
 export default function Requests() {
-  const { requests } = useApp()
+  const { requests, user, isAgent } = useApp()
   const [params, setParams] = useSearchParams()
   const [q, setQ] = useState('')
   const [priority, setPriority] = useState('')
@@ -24,11 +24,11 @@ export default function Requests() {
       .filter((r) => !status || r.status === status)
       .filter((r) => !priority || r.priority === priority)
       .filter((r) => !category || r.category === category)
-      .filter((r) => tab !== 'minhas' || r.requester === CURRENT_USER)
+      .filter((r) => tab !== 'minhas' || (isAgent ? r.assignee : r.requester) === user.name)
       .filter((r) => tab !== 'abertas' || r.status !== 'concluida')
       .filter((r) => !s || r.title.toLowerCase().includes(s) || fmtId(r.id).includes(s))
       .sort((a, b) => (desc ? b.id - a.id : a.id - b.id))
-  }, [requests, q, status, priority, category, tab, desc])
+  }, [requests, user, isAgent, q, status, priority, category, tab, desc])
 
   const pages = Math.max(1, Math.ceil(list.length / PER_PAGE))
   const cur = Math.min(page, pages)
@@ -50,7 +50,7 @@ export default function Requests() {
   }
   const tabs = [
     ['todas', 'Todas'],
-    ['minhas', 'Minhas'],
+    ['minhas', isAgent ? 'Atribuídas a mim' : 'Minhas'],
     ['abertas', 'Em aberto'],
   ]
 

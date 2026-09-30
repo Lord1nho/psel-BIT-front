@@ -8,8 +8,8 @@ import NewRequest from './pages/NewRequest'
 import RequestDetail from './pages/RequestDetail'
 
 function Routing() {
-  const { authed } = useApp()
-  if (!authed)
+  const { user } = useApp()
+  if (!user)
     return (
       <Routes>
         <Route path="*" element={<Login />} />
