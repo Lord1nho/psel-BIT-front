@@ -226,3 +226,6 @@ select:disabled { background: #f4f6f9; cursor: not-allowed; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 @media (max-width: 960px) { .grid.kpis4 { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .grid.kpis4 { grid-template-columns: 1fr; } .rate { flex-wrap: wrap; } }
+.note { margin: 0; font-size: 13px; }
+.hint { margin: -4px 0 4px; font-size: 12px; }
+.chart.short { height: 260px; }

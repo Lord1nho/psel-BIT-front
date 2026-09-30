@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context'
 import * as api from '../services/api'
+import { invalidateDashboard } from '../queryClient'
 
 export default function NewRequest() {
   const { notify } = useApp()
@@ -28,6 +29,7 @@ export default function NewRequest() {
     setError('')
     try {
       const created = await api.createRequest(f)
+      invalidateDashboard()
       notify(`Solicitação #${String(created.id).padStart(4, '0')} criada com sucesso`)
       nav(`/solicitacoes/${created.id}`)
     } catch (err) {

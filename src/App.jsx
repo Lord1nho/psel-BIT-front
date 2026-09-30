@@ -28,7 +28,7 @@ function Routing() {
     <>
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={isAgent ? <Dashboard /> : <Navigate to="/solicitacoes" replace />} />
+        <Route index element={<Dashboard />} />
         <Route path="solicitacoes" element={<Requests />} />
         <Route path="solicitacoes/:id" element={<RequestDetail />} />
         {!isAgent && <Route path="nova" element={<NewRequest />} />}

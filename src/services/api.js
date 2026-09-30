@@ -1,7 +1,6 @@
 // Camada de acesso à API (contrato em docs/api.md). Converte os payloads em
 // português da API para o formato usado pelas telas.
 import { request, session } from './http'
-import { MOCK_DASHBOARD_REQUESTS } from '../data/mock'
 
 const toUser = (u) => ({ id: u.id, name: u.nome, username: u.usuario, role: u.perfil })
 
@@ -13,6 +12,9 @@ const toListItem = (r) => ({
   category: r.categoria?.nome,
   requester: r.solicitante?.nome,
   requesterId: r.solicitante?.id,
+  assignee: r.atendente?.nome ?? null,
+  assigneeId: r.atendente?.id ?? null,
+  updatedAt: r.ultimaAtualizacao,
 })
 
 const toDetail = (r) => ({
@@ -91,42 +93,21 @@ export const deleteRequest = (id) => request(`/solicitacoes/${id}`, { method: 'D
 export const updateStatus = (id, status) => request(`/solicitacoes/${id}/status`, { method: 'PATCH', body: { status } })
 
 /**
- * Dashboard (UC07) — MOCK. Endpoint ainda não publicado (docs/api.md §10).
- * Quando existir (sugestão: GET /dashboard?dataInicio&dataFim&categoriaId, só ATENDENTE),
- * trocar o corpo por: `return request('/dashboard', { query: { dataInicio: from, dataFim: to, categoriaId: categoryId } })`
- * mantendo este formato de retorno.
+ * GET /dashboard — SOLICITANTE (só as próprias) e ATENDENTE (todas, ou `escopo: 'meus'`).
+ * Filtros: `periodo` ('tudo' | '30d' | '7d') OU `dataInicio`/`dataFim` (nunca os dois),
+ * `categoriaId`, `agrupamento` ('auto' | 'dia' | 'semana' | 'mes'), `escopo` ('geral' | 'meus').
+ * Retorna o payload da API sem adaptação.
  */
-export async function getDashboard({ from, to, categoryId } = {}) {
-  await new Promise((r) => setTimeout(r, 350))
-  const day = (iso) => iso.slice(0, 10)
-  const rows = MOCK_DASHBOARD_REQUESTS.filter(
-    (r) =>
-      (!from || day(r.dataCriacao) >= from) &&
-      (!to || day(r.dataCriacao) <= to) &&
-      (!categoryId || r.categoriaId === Number(categoryId)),
-  )
-  const count = (st, list = rows) => list.filter((r) => r.status === st).length
-
-  const cats = {}
-  const days = {}
-  rows.forEach((r) => {
-    cats[r.categoria] ||= { categoria: r.categoria, abertas: 0, emAtendimento: 0, concluidas: 0 }
-    const c = cats[r.categoria]
-    if (r.status === 'ABERTO') c.abertas++
-    else if (r.status === 'EM_ATENDIMENTO') c.emAtendimento++
-    else c.concluidas++
-    const d = day(r.dataCriacao)
-    days[d] ||= { data: d, criadas: 0, concluidas: 0 }
-    days[d].criadas++
-    if (r.status === 'CONCLUIDO') days[d].concluidas++
+export function getDashboard({ periodo, dataInicio, dataFim, categoriaId, agrupamento, escopo } = {}) {
+  const custom = dataInicio || dataFim
+  return request('/dashboard', {
+    query: {
+      periodo: custom ? undefined : periodo,
+      dataInicio,
+      dataFim,
+      categoriaId,
+      agrupamento,
+      escopo,
+    },
   })
-
-  return {
-    total: rows.length,
-    abertas: count('ABERTO'),
-    emAtendimento: count('EM_ATENDIMENTO'),
-    concluidas: count('CONCLUIDO'),
-    porCategoria: Object.values(cats),
-    porDia: Object.values(days).sort((a, b) => a.data.localeCompare(b.data)),
-  }
 }

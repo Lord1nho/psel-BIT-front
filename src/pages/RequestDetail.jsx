@@ -4,6 +4,7 @@ import { ArrowLeft, MessageSquare, Circle, Clock, Pencil, Trash2 } from 'lucide-
 import { useApp } from '../context'
 import { STATUS, PRIORITY } from '../data/mock'
 import * as api from '../services/api'
+import { invalidateDashboard } from '../queryClient'
 import { fmtId, fmtDate, StatusBadge, Avatar } from '../components/Shared'
 
 export default function RequestDetail() {
@@ -63,6 +64,7 @@ export default function RequestDetail() {
     setFormError('')
     try {
       const updated = await api.updateRequest(r.id, patch)
+      invalidateDashboard()
       setR({ ...r, ...updated, requester: r.requester, history: r.history })
       setEditing(false)
       notify('Solicitação atualizada')
@@ -78,6 +80,7 @@ export default function RequestDetail() {
     setBusy(true)
     try {
       await api.deleteRequest(r.id)
+      invalidateDashboard()
       notify('Solicitação excluída')
       nav('/solicitacoes')
     } catch (err) {
@@ -100,6 +103,7 @@ export default function RequestDetail() {
       for (const step of FLOW.slice(FLOW.indexOf(r.status) + 1, FLOW.indexOf(selected) + 1)) {
         await api.updateStatus(r.id, step)
       }
+      invalidateDashboard()
       setR(await api.getRequest(r.id))
       setNewStatus(null)
       notify(`Status alterado para ${label(selected)}`)

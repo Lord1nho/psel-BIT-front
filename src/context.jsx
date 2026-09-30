@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import * as api from './services/api'
 import { session, setUnauthorizedHandler } from './services/http'
+import { queryClient } from './queryClient'
 
 const Ctx = createContext(null)
 // eslint-disable-next-line react-refresh/only-export-components
@@ -18,6 +19,7 @@ export function AppProvider({ children }) {
   // 401 fora do login: token ausente/expirado -> volta para a tela de login
   useEffect(() => {
     setUnauthorizedHandler(() => {
+      queryClient.clear()
       setUser(null)
       notify('Sessão expirada. Entre novamente.')
     })
@@ -26,6 +28,7 @@ export function AppProvider({ children }) {
   const login = async (credentials) => setUser(await api.login(credentials))
   const logout = async () => {
     await api.logout()
+    queryClient.clear()
     setUser(null)
   }
 

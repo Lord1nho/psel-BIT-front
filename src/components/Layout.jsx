@@ -26,11 +26,9 @@ export default function Layout() {
           </span>
         </div>
         <nav>
-          {isAgent && (
-            <NavLink to="/" end className={link}>
-              <LayoutDashboard size={18} /> Dashboard
-            </NavLink>
-          )}
+          <NavLink to="/" end className={link}>
+            <LayoutDashboard size={18} /> Dashboard
+          </NavLink>
           <NavLink to="/solicitacoes" className={link}>
             <Ticket size={18} /> Solicitações
           </NavLink>

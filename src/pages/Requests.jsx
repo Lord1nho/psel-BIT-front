@@ -9,15 +9,17 @@ import { fmtId, fmtDate, StatusBadge } from '../components/Shared'
 const PER_PAGE = 8
 
 export default function Requests() {
-  const { isAgent } = useApp()
+  const { isAgent, user } = useApp()
   const [params, setParams] = useSearchParams()
   const initialStatus = params.get('status')
   const [q, setQ] = useState(params.get('q') || '')
   const [debouncedQ, setDebouncedQ] = useState(q)
   const [status, setStatus] = useState(API_STATUSES.includes(initialStatus) ? initialStatus : '')
-  const [categoryId, setCategoryId] = useState('')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
+  // filtros iniciais vindos da URL (ex.: clique num card do dashboard)
+  const [categoryId, setCategoryId] = useState(params.get('categoriaId') || '')
+  const [assigneeId, setAssigneeId] = useState(params.get('atendente') || '') // '' = todos · 'none' = sem atendente · id
+  const [from, setFrom] = useState(params.get('dataInicio') || '')
+  const [to, setTo] = useState(params.get('dataFim') || '')
   const [page, setPage] = useState(1)
   const [categories, setCategories] = useState([])
   const [list, setList] = useState([])
@@ -54,9 +56,19 @@ export default function Requests() {
     }
   }, [status, categoryId, debouncedQ, from, to, invalidRange])
 
-  const pages = Math.max(1, Math.ceil(list.length / PER_PAGE))
+  // A API ainda não filtra por atendente: o filtro é aplicado aqui, sobre o resultado já filtrado pelo servidor.
+  // Trocar por um parâmetro de query quando o contrato oferecer.
+  const visible = list.filter((r) =>
+    !assigneeId ? true : assigneeId === 'none' ? r.assigneeId === null : String(r.assigneeId) === assigneeId,
+  )
+  // "Meus" = o próprio atendente logado, sempre primeiro e com o nome dele; depois os demais
+  const others = new Map(list.filter((r) => r.assigneeId !== null && r.assigneeId !== user.id).map((r) => [String(r.assigneeId), r.assignee]))
+  const assignees = [...(isAgent ? [[String(user.id), user.name]] : []), ...others]
+  if (assigneeId && assigneeId !== 'none' && !assignees.some(([id]) => id === assigneeId)) assignees.push([assigneeId, 'Atendente selecionado'])
+
+  const pages = Math.max(1, Math.ceil(visible.length / PER_PAGE))
   const cur = Math.min(page, pages)
-  const rows = list.slice((cur - 1) * PER_PAGE, cur * PER_PAGE)
+  const rows = visible.slice((cur - 1) * PER_PAGE, cur * PER_PAGE)
 
   const change = (setter) => (e) => {
     setter(e.target.value)
@@ -66,6 +78,7 @@ export default function Requests() {
     setQ('')
     setStatus('')
     setCategoryId('')
+    setAssigneeId('')
     setFrom('')
     setTo('')
     setPage(1)
@@ -104,6 +117,13 @@ export default function Requests() {
               <option key={c.id} value={c.id}>{c.nome}</option>
             ))}
           </select>
+          <select value={assigneeId} onChange={change(setAssigneeId)}>
+            <option value="">{isAgent ? 'Todos (Geral)' : 'Todos os atendentes'}</option>
+            <option value="none">Sem atendente</option>
+            {assignees.map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+          </select>
           <label className="date-field">
             De <input type="date" value={from} onChange={change(setFrom)} />
           </label>
@@ -132,7 +152,9 @@ export default function Requests() {
                   <th>Título</th>
                   <th>Categoria</th>
                   <th>Solicitante</th>
+                  <th>Atendente</th>
                   <th>Abertura</th>
+                  <th>Última atualização</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -143,7 +165,9 @@ export default function Requests() {
                     <td><Link to={`/solicitacoes/${r.id}`} className="title-link">{r.title}</Link></td>
                     <td>{r.category}</td>
                     <td>{r.requester}</td>
+                    <td>{r.assignee || <span className="muted">Sem atendente</span>}</td>
                     <td className="muted">{fmtDate(r.createdAt)}</td>
+                    <td className="muted">{r.updatedAt ? fmtDate(r.updatedAt) : '—'}</td>
                     <td><StatusBadge status={r.status} /></td>
                   </tr>
                 ))}
@@ -153,7 +177,7 @@ export default function Requests() {
         )}
 
         <div className="pager">
-          <span className="muted">{list.length} resultado(s)</span>
+          <span className="muted">{visible.length} resultado(s)</span>
           <div className="row">
             <button className="icon-btn" disabled={cur === 1} onClick={() => setPage(cur - 1)}><ChevronLeft size={18} /></button>
             <span>{cur} / {pages}</span>
