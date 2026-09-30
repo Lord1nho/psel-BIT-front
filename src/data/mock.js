@@ -1,9 +1,11 @@
+// Chaves iguais ao enum da API.
 export const STATUS = {
-  aberta: { label: 'Aberta', color: '#337AB7' },
-  andamento: { label: 'Em andamento', color: '#3EC1D5' },
-  aguardando: { label: 'Aguardando', color: '#F0A030' },
-  concluida: { label: 'Concluída', color: '#3BA55D' },
+  ABERTO: { label: 'Aberto', color: '#337AB7' },
+  EM_ATENDIMENTO: { label: 'Em atendimento', color: '#3EC1D5' },
+  CONCLUIDO: { label: 'Concluído', color: '#3BA55D' },
 }
+
+export const API_STATUSES = ['ABERTO', 'EM_ATENDIMENTO', 'CONCLUIDO']
 
 export const PRIORITY = {
   baixa: { label: 'Baixa', color: '#8A94A6' },
@@ -12,50 +14,32 @@ export const PRIORITY = {
   critica: { label: 'Crítica', color: '#E5322D' },
 }
 
-export const CATEGORIES = ['TI / Suporte', 'Infraestrutura', 'RH', 'Financeiro', 'Compras', 'Facilities']
+export const ROLES = { SOLICITANTE: 'Solicitante', ATENDENTE: 'Atendente' }
 
-export const ROLES = { solicitante: 'Solicitante', atendente: 'Atendente' }
-
-export const AGENTS = ['Ana Souza', 'Bruno Lima', 'Carla Mendes', 'Diego Alves', 'Elisa Rocha']
-
-export const MOCK_USERS = [
-  { name: 'Luiz Fernando', email: 'solicitante@bit.com', role: 'solicitante' },
-  { name: 'Ana Souza', email: 'atendente@bit.com', role: 'atendente' },
+// ---- Dashboard (UC07) — mock até o back publicar o endpoint ----
+// Mesmas categorias/ids de GET /categorias.
+const MOCK_CATEGORIES = [
+  { id: 1, nome: 'TI' },
+  { id: 2, nome: 'RH' },
+  { id: 3, nome: 'Compras' },
+  { id: 4, nome: 'Financeiro' },
+  { id: 5, nome: 'Infraestrutura' },
 ]
 
-const CURRENT_USER = 'Luiz Fernando'
+// Gerador determinístico, para o painel não mudar a cada recarga.
+const rand = (() => {
+  let x = 42
+  return () => (x = (x * 1664525 + 1013904223) % 4294967296) / 4294967296
+})()
 
-const d = (days) => new Date(Date.now() - days * 86400000).toISOString()
+const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString()
 
-export const INITIAL_REQUESTS = [
-  ['Notebook não liga após atualização', 'TI / Suporte', 'alta', 'andamento', 'Ana Souza', 'Marcos Paiva', 1],
-  ['Solicitação de acesso à VPN', 'Infraestrutura', 'media', 'aberta', null, CURRENT_USER, 0],
-  ['Reembolso de despesas de viagem', 'Financeiro', 'baixa', 'aguardando', 'Carla Mendes', 'Paula Nunes', 3],
-  ['Servidor de arquivos fora do ar', 'Infraestrutura', 'critica', 'andamento', 'Bruno Lima', 'Rafael Costa', 0],
-  ['Atualização de dados cadastrais', 'RH', 'baixa', 'concluida', 'Elisa Rocha', CURRENT_USER, 6],
-  ['Compra de monitores adicionais', 'Compras', 'media', 'aguardando', 'Diego Alves', 'Tânia Reis', 4],
-  ['Ar-condicionado da sala 2 com ruído', 'Facilities', 'media', 'aberta', null, 'João Pedro', 2],
-  ['Erro ao emitir nota fiscal', 'Financeiro', 'alta', 'andamento', 'Carla Mendes', CURRENT_USER, 1],
-  ['Instalação do Office em nova máquina', 'TI / Suporte', 'baixa', 'concluida', 'Ana Souza', 'Lívia Teles', 8],
-  ['Solicitação de férias — setembro', 'RH', 'baixa', 'concluida', 'Elisa Rocha', CURRENT_USER, 10],
-  ['Impressora do 3º andar sem toner', 'Facilities', 'baixa', 'aberta', null, 'Marcos Paiva', 0],
-  ['Lentidão na rede Wi-Fi', 'Infraestrutura', 'alta', 'aberta', null, 'Paula Nunes', 1],
-].map(([title, category, priority, status, assignee, requester, age], i) => ({
-  id: i + 1,
-  title,
-  category,
-  priority,
-  status,
-  assignee,
-  requester,
-  createdAt: d(age),
-  description:
-    'Descrição detalhada da demanda. O colaborador relata o problema, o impacto no trabalho e o que já foi tentado até o momento.',
-  history: [
-    { type: 'event', author: requester, text: 'abriu a solicitação', at: d(age) },
-    ...(assignee ? [{ type: 'event', author: assignee, text: 'assumiu a solicitação', at: d(Math.max(age - 0.5, 0)) }] : []),
-    ...(age > 1
-      ? [{ type: 'comment', author: assignee || 'Suporte', text: 'Estamos analisando o caso e retornamos em breve.', at: d(age - 1) }]
-      : []),
-  ],
-}))
+export const MOCK_DASHBOARD_REQUESTS = Array.from({ length: 90 }, (_, i) => {
+  const age = Math.floor(rand() * rand() * 45) // mais chamados recentes
+  const r = rand()
+  const cat = MOCK_CATEGORIES[Math.floor(rand() * rand() * 5)] // TI domina
+  // chamados antigos tendem a estar concluídos
+  const done = age > 10 ? 0.75 : age > 3 ? 0.4 : 0.1
+  const status = r < done ? 'CONCLUIDO' : r < done + (1 - done) * 0.5 ? 'EM_ATENDIMENTO' : 'ABERTO'
+  return { codigo: i + 1, status, categoriaId: cat.id, categoria: cat.nome, dataCriacao: daysAgo(age) }
+})

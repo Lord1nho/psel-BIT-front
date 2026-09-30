@@ -1,127 +1,139 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Search, PlusCircle, ChevronLeft, ChevronRight, Inbox, ArrowUpDown } from 'lucide-react'
+import { Search, PlusCircle, ChevronLeft, ChevronRight, Inbox } from 'lucide-react'
 import { useApp } from '../context'
-import { STATUS, PRIORITY, CATEGORIES } from '../data/mock'
-import { fmtId, fmtDate, StatusBadge, PriorityBadge, Avatar } from '../components/Shared'
+import { STATUS, API_STATUSES } from '../data/mock'
+import * as api from '../services/api'
+import { fmtId, fmtDate, StatusBadge } from '../components/Shared'
 
 const PER_PAGE = 8
 
 export default function Requests() {
-  const { requests, user, isAgent } = useApp()
+  const { isAgent } = useApp()
   const [params, setParams] = useSearchParams()
-  const [q, setQ] = useState('')
-  const [priority, setPriority] = useState('')
-  const [category, setCategory] = useState('')
-  const [tab, setTab] = useState('todas')
-  const [desc, setDesc] = useState(true)
+  const initialStatus = params.get('status')
+  const [q, setQ] = useState(params.get('q') || '')
+  const [debouncedQ, setDebouncedQ] = useState(q)
+  const [status, setStatus] = useState(API_STATUSES.includes(initialStatus) ? initialStatus : '')
+  const [categoryId, setCategoryId] = useState('')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
   const [page, setPage] = useState(1)
-  const status = params.get('status') || ''
+  const [categories, setCategories] = useState([])
+  const [list, setList] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const list = useMemo(() => {
-    const s = q.toLowerCase()
-    return requests
-      .filter((r) => !status || r.status === status)
-      .filter((r) => !priority || r.priority === priority)
-      .filter((r) => !category || r.category === category)
-      .filter((r) => tab !== 'minhas' || (isAgent ? r.assignee : r.requester) === user.name)
-      .filter((r) => tab !== 'abertas' || r.status !== 'concluida')
-      .filter((r) => !s || r.title.toLowerCase().includes(s) || fmtId(r.id).includes(s))
-      .sort((a, b) => (desc ? b.id - a.id : a.id - b.id))
-  }, [requests, user, isAgent, q, status, priority, category, tab, desc])
+  const invalidRange = from && to && to < from
+
+  useEffect(() => {
+    api.getCategories().then(setCategories).catch(() => {})
+  }, [])
+
+  // busca dinâmica: debounce de ~300 ms; campo vazio não envia `q`
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q), 300)
+    return () => clearTimeout(t)
+  }, [q])
+
+  useEffect(() => {
+    if (invalidRange) return
+    let cancelled = false
+    setLoading(true)
+    api
+      .listRequests({ status, categoryId, q: debouncedQ, from, to })
+      .then((r) => {
+        if (cancelled) return
+        setList(r)
+        setError('')
+      })
+      .catch((e) => !cancelled && setError(e.message))
+      .finally(() => !cancelled && setLoading(false))
+    return () => {
+      cancelled = true
+    }
+  }, [status, categoryId, debouncedQ, from, to, invalidRange])
 
   const pages = Math.max(1, Math.ceil(list.length / PER_PAGE))
   const cur = Math.min(page, pages)
   const rows = list.slice((cur - 1) * PER_PAGE, cur * PER_PAGE)
-  const reset = (fn) => (e) => {
-    fn(e.target.value)
-    setPage(1)
-  }
-  const setStatus = (v) => {
-    setParams(v ? { status: v } : {})
+
+  const change = (setter) => (e) => {
+    setter(e.target.value)
     setPage(1)
   }
   const clear = () => {
     setQ('')
-    setPriority('')
-    setCategory('')
-    setTab('todas')
     setStatus('')
+    setCategoryId('')
+    setFrom('')
+    setTo('')
+    setPage(1)
+    setParams({})
   }
-  const tabs = [
-    ['todas', 'Todas'],
-    ['minhas', isAgent ? 'Atribuídas a mim' : 'Minhas'],
-    ['abertas', 'Em aberto'],
-  ]
 
   return (
     <>
       <div className="page-head">
         <div>
           <h1>Solicitações</h1>
-          <p className="muted">Consulte, filtre e gerencie as demandas</p>
+          <p className="muted">{isAgent ? 'Todas as solicitações' : 'Suas solicitações'}</p>
         </div>
-        <Link to="/nova" className="btn primary">
-          <PlusCircle size={16} /> Nova solicitação
-        </Link>
+        {!isAgent && (
+          <Link to="/nova" className="btn primary">
+            <PlusCircle size={16} /> Nova solicitação
+          </Link>
+        )}
       </div>
 
       <div className="card table-card">
-        <div className="tabs">
-          {tabs.map(([k, l]) => (
-            <button key={k} className={tab === k ? 'active' : ''} onClick={() => { setTab(k); setPage(1) }}>
-              {l}
-            </button>
-          ))}
-        </div>
-
         <div className="filters">
           <label className="search grow">
             <Search size={16} />
-            <input placeholder="Buscar por título ou #ID" value={q} onChange={reset(setQ)} />
+            <input placeholder="Buscar por título, solicitante ou código" maxLength={100} value={q} onChange={change(setQ)} />
           </label>
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <select value={status} onChange={change(setStatus)}>
             <option value="">Todos os status</option>
-            {Object.entries(STATUS).map(([k, s]) => (
-              <option key={k} value={k}>{s.label}</option>
+            {API_STATUSES.map((k) => (
+              <option key={k} value={k}>{STATUS[k].label}</option>
             ))}
           </select>
-          <select value={priority} onChange={reset(setPriority)}>
-            <option value="">Todas as prioridades</option>
-            {Object.entries(PRIORITY).map(([k, p]) => (
-              <option key={k} value={k}>{p.label}</option>
-            ))}
-          </select>
-          <select value={category} onChange={reset(setCategory)}>
+          <select value={categoryId} onChange={change(setCategoryId)}>
             <option value="">Todas as categorias</option>
-            {CATEGORIES.map((c) => (
-              <option key={c}>{c}</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.nome}</option>
             ))}
           </select>
+          <label className="date-field">
+            De <input type="date" value={from} onChange={change(setFrom)} />
+          </label>
+          <label className="date-field">
+            Até <input type="date" value={to} min={from || undefined} onChange={change(setTo)} />
+          </label>
           <button className="btn ghost" onClick={clear}>Limpar</button>
         </div>
+        {invalidRange && <p className="error pad">A data final não pode ser anterior à inicial.</p>}
+        {error && <p className="error pad">{error}</p>}
 
-        {rows.length === 0 ? (
+        {loading ? (
+          <div className="empty muted">Carregando...</div>
+        ) : rows.length === 0 ? (
           <div className="empty">
             <Inbox size={40} />
             <h3>Nenhuma solicitação encontrada</h3>
-            <p className="muted">Ajuste os filtros ou crie uma nova solicitação.</p>
+            <p className="muted">Ajuste os filtros{isAgent ? '.' : ' ou crie uma nova solicitação.'}</p>
           </div>
         ) : (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th onClick={() => setDesc(!desc)} className="sortable">
-                    ID <ArrowUpDown size={12} />
-                  </th>
-                  <th>Assunto</th>
-                  <th>Solicitante</th>
+                  <th>Código</th>
+                  <th>Título</th>
                   <th>Categoria</th>
-                  <th>Prioridade</th>
+                  <th>Solicitante</th>
+                  <th>Abertura</th>
                   <th>Status</th>
-                  <th>Responsável</th>
-                  <th>Criada em</th>
                 </tr>
               </thead>
               <tbody>
@@ -129,18 +141,10 @@ export default function Requests() {
                   <tr key={r.id}>
                     <td className="muted">{fmtId(r.id)}</td>
                     <td><Link to={`/solicitacoes/${r.id}`} className="title-link">{r.title}</Link></td>
-                    <td>{r.requester}</td>
                     <td>{r.category}</td>
-                    <td><PriorityBadge priority={r.priority} /></td>
-                    <td><StatusBadge status={r.status} /></td>
-                    <td>
-                      {r.assignee ? (
-                        <span className="row"><Avatar name={r.assignee} size={24} /> {r.assignee}</span>
-                      ) : (
-                        <span className="muted">Não atribuída</span>
-                      )}
-                    </td>
+                    <td>{r.requester}</td>
                     <td className="muted">{fmtDate(r.createdAt)}</td>
+                    <td><StatusBadge status={r.status} /></td>
                   </tr>
                 ))}
               </tbody>

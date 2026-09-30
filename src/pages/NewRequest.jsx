@@ -1,18 +1,39 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context'
-import { CATEGORIES, PRIORITY } from '../data/mock'
+import * as api from '../services/api'
 
 export default function NewRequest() {
-  const { addRequest } = useApp()
+  const { notify } = useApp()
   const nav = useNavigate()
-  const [f, setF] = useState({ title: '', category: CATEGORIES[0], priority: 'media', description: '' })
+  const [categories, setCategories] = useState([])
+  const [f, setF] = useState({ title: '', categoryId: '', description: '' })
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
+
+  useEffect(() => {
+    api
+      .getCategories()
+      .then((c) => {
+        setCategories(c)
+        setF((prev) => ({ ...prev, categoryId: c[0]?.id ?? '' }))
+      })
+      .catch((e) => setError(e.message))
+  }, [])
 
   const submit = async (e) => {
     e.preventDefault()
-    const id = await addRequest(f)
-    nav(`/solicitacoes/${id}`)
+    setBusy(true)
+    setError('')
+    try {
+      const created = await api.createRequest(f)
+      notify(`Solicitação #${String(created.id).padStart(4, '0')} criada com sucesso`)
+      nav(`/solicitacoes/${created.id}`)
+    } catch (err) {
+      setError(err.message)
+      setBusy(false)
+    }
   }
 
   return (
@@ -27,33 +48,24 @@ export default function NewRequest() {
       <form className="card form" onSubmit={submit}>
         <label className="field">
           Assunto *
-          <input required maxLength={100} placeholder="Resuma o problema em uma frase" value={f.title} onChange={set('title')} />
+          <input required maxLength={255} placeholder="Resuma o problema em uma frase" value={f.title} onChange={set('title')} />
         </label>
-        <div className="grid two tight">
-          <label className="field">
-            Categoria
-            <select value={f.category} onChange={set('category')}>
-              {CATEGORIES.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            Prioridade
-            <select value={f.priority} onChange={set('priority')}>
-              {Object.entries(PRIORITY).map(([k, p]) => (
-                <option key={k} value={k}>{p.label}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <label className="field">
+          Categoria *
+          <select required value={f.categoryId} onChange={set('categoryId')}>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.nome}</option>
+            ))}
+          </select>
+        </label>
         <label className="field">
           Descrição *
           <textarea required rows={6} placeholder="Inclua detalhes, passos para reproduzir e impacto no trabalho" value={f.description} onChange={set('description')} />
         </label>
+        {error && <p className="error">{error}</p>}
         <div className="row end">
           <button type="button" className="btn ghost" onClick={() => nav(-1)}>Cancelar</button>
-          <button className="btn primary">Enviar solicitação</button>
+          <button className="btn primary" disabled={busy || !f.categoryId}>{busy ? 'Enviando...' : 'Enviar solicitação'}</button>
         </div>
       </form>
     </>

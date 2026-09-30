@@ -66,7 +66,6 @@ textarea { resize: vertical; }
 .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
 .page-head h1 { margin: 0; }
 .grid { display: grid; gap: 16px; margin-bottom: 16px; }
-.grid.kpis { grid-template-columns: repeat(4, 1fr); }
 .grid.two { grid-template-columns: 1fr 1fr; }
 .grid.tight { gap: 16px; }
 .grid .card { margin-bottom: 0; }
@@ -164,7 +163,6 @@ tbody tr:hover { background: #f5fbfd; }
 .toast { position: fixed; bottom: 24px; right: 24px; display: flex; align-items: center; gap: 8px; background: var(--navy); color: #fff; padding: 12px 18px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.25); border-left: 4px solid var(--primary); z-index: 20; }
 
 @media (max-width: 960px) {
-  .grid.kpis { grid-template-columns: repeat(2, 1fr); }
   .grid.two, .detail { grid-template-columns: 1fr; }
   .auth { grid-template-columns: 1fr; }
   .auth-hero { padding: 32px 24px; }
@@ -176,7 +174,6 @@ tbody tr:hover { background: #f5fbfd; }
 }
 @media (max-width: 560px) {
   .hide-sm { display: none !important; }
-  .grid.kpis { grid-template-columns: 1fr 1fr; }
   .filters select { width: 100%; }
 }
 
@@ -186,3 +183,46 @@ tbody tr:hover { background: #f5fbfd; }
 .demo { font-size: 12px; }
 select:disabled { background: #f4f6f9; cursor: not-allowed; }
 .btn:disabled { opacity: 0.6; cursor: default; }
+.date-field { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.date-field input { width: auto; }
+.pad { padding: 0 16px; }
+.btn.danger { background: #fff; color: #e5322d; border-color: #e5322d; }
+.btn.danger:hover:not(:disabled) { background: #e5322d; color: #fff; }
+.edit-form { display: flex; flex-direction: column; }
+
+/* Dashboard */
+.grid.kpis4 { grid-template-columns: repeat(4, 1fr); }
+.dash-filters { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; }
+.dash-filters select { width: auto; }
+.chips { display: flex; gap: 6px; margin-right: auto; }
+.chip { font: inherit; font-weight: 600; padding: 6px 14px; border-radius: 999px; border: 1px solid #ccc; background: #fff; cursor: pointer; color: var(--text); }
+.chip:hover { border-color: var(--primary); }
+.chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.dash { display: flex; flex-direction: column; gap: 16px; transition: opacity .2s; }
+.dash.loading { opacity: .55; }
+.dash > .grid, .dash > .card { margin-bottom: 0; }
+.kpi-lg { display: flex; flex-direction: column; gap: 2px; color: inherit; border-top: 4px solid var(--c); transition: .15s; }
+.kpi-lg:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(20,30,70,.14); color: inherit; }
+.kpi-top { display: flex; justify-content: space-between; align-items: center; }
+.kpi-pct { font-size: 12px; font-weight: 600; color: var(--c); background: color-mix(in srgb, var(--c) 12%, white); padding: 2px 10px; border-radius: 999px; }
+.kpi-lg strong { font-size: 44px; line-height: 1.1; color: var(--c); margin-top: 8px; }
+.kpi-lg h4 { margin: 0; color: var(--text-strong); font-size: 15px; }
+.kpi-lg p { margin: 0 0 10px; font-size: 13px; }
+.meter { height: 6px; background: #eef1f5; border-radius: 4px; overflow: hidden; margin-top: auto; }
+.meter i { display: block; height: 100%; background: var(--c, var(--primary)); border-radius: 4px; transition: width .6s; }
+.meter.big { height: 10px; margin-top: 10px; }
+.meter.big i { background: linear-gradient(90deg, var(--primary), #3ba55d); }
+.rate { display: flex; align-items: center; gap: 16px; }
+.rate > svg { color: var(--primary-dark); }
+.rate h3 { margin: 0; }
+.rate p { margin: 0; }
+.rate > strong { font-size: 36px; color: var(--text-strong); }
+.chart { position: relative; height: 280px; }
+.chart.tall { height: 320px; }
+.donut-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -62%); text-align: center; pointer-events: none; }
+.donut-center strong { display: block; font-size: 30px; line-height: 1; color: var(--text-strong); }
+.donut-center span { color: var(--muted); font-size: 12px; }
+.skeleton { background: linear-gradient(90deg, #eef1f5 25%, #f8fafc 50%, #eef1f5 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+@media (max-width: 960px) { .grid.kpis4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .grid.kpis4 { grid-template-columns: 1fr; } .rate { flex-wrap: wrap; } }
