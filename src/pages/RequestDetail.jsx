@@ -5,6 +5,7 @@ import { useApp } from '../context'
 import { STATUS, PRIORITY } from '../data/mock'
 import * as api from '../services/api'
 import { invalidateDashboard } from '../queryClient'
+import { useAction } from '../hooks/useAction'
 import { fmtId, fmtDate, StatusBadge, Avatar } from '../components/Shared'
 
 export default function RequestDetail() {
@@ -17,7 +18,7 @@ export default function RequestDetail() {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({})
   const [formError, setFormError] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [run, busy] = useAction()
   const [newStatus, setNewStatus] = useState(null)
 
   useEffect(() => {
@@ -60,33 +61,32 @@ export default function RequestDetail() {
     if (form.description !== r.description) patch.description = form.description
     if (Number(form.categoryId) !== r.categoryId) patch.categoryId = form.categoryId
     if (!Object.keys(patch).length) return setEditing(false)
-    setBusy(true)
-    setFormError('')
-    try {
-      const updated = await api.updateRequest(r.id, patch)
-      invalidateDashboard()
-      setR({ ...r, ...updated, requester: r.requester, history: r.history })
-      setEditing(false)
-      notify('Solicitação atualizada')
-    } catch (err) {
-      setFormError(err.message)
-    } finally {
-      setBusy(false)
-    }
+    return run(async () => {
+      setFormError('')
+      try {
+        const updated = await api.updateRequest(r.id, patch)
+        invalidateDashboard()
+        setR({ ...r, ...updated, requester: r.requester, history: r.history })
+        setEditing(false)
+        notify('Solicitação atualizada')
+      } catch (err) {
+        setFormError(err.message)
+      }
+    })
   }
 
-  const remove = async () => {
+  const remove = () => {
     if (!window.confirm(`Excluir a solicitação ${fmtId(r.id)}? Esta ação não pode ser desfeita.`)) return
-    setBusy(true)
-    try {
-      await api.deleteRequest(r.id)
-      invalidateDashboard()
-      notify('Solicitação excluída')
-      nav('/solicitacoes')
-    } catch (err) {
-      notify(err.message)
-      setBusy(false)
-    }
+    return run(async () => {
+      try {
+        await api.deleteRequest(r.id)
+        invalidateDashboard()
+        notify('Solicitação excluída')
+        nav('/solicitacoes')
+      } catch (err) {
+        notify(err.message)
+      }
+    })
   }
 
   const label = (s) => STATUS[s]?.label || s
@@ -97,24 +97,22 @@ export default function RequestDetail() {
   const selected = newStatus ?? r.status
   const dirty = selected !== r.status
 
-  const saveStatus = async () => {
-    setBusy(true)
-    try {
-      for (const step of FLOW.slice(FLOW.indexOf(r.status) + 1, FLOW.indexOf(selected) + 1)) {
-        await api.updateStatus(r.id, step)
+  const saveStatus = () =>
+    run(async () => {
+      try {
+        for (const step of FLOW.slice(FLOW.indexOf(r.status) + 1, FLOW.indexOf(selected) + 1)) {
+          await api.updateStatus(r.id, step)
+        }
+        invalidateDashboard()
+        setR(await api.getRequest(r.id))
+        setNewStatus(null)
+        notify(`Status alterado para ${label(selected)}`)
+      } catch (err) {
+        notify(err.message)
+        // outro atendente pode ter alterado antes: recarrega o estado atual
+        api.getRequest(r.id).then((d) => { setR(d); setNewStatus(null) }).catch(() => {})
       }
-      invalidateDashboard()
-      setR(await api.getRequest(r.id))
-      setNewStatus(null)
-      notify(`Status alterado para ${label(selected)}`)
-    } catch (err) {
-      notify(err.message)
-      // outro atendente pode ter alterado antes: recarrega o estado atual
-      api.getRequest(r.id).then((d) => { setR(d); setNewStatus(null) }).catch(() => {})
-    } finally {
-      setBusy(false)
-    }
-  }
+    })
 
   return (
     <>

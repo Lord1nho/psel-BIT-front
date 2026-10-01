@@ -1,24 +1,25 @@
 import { useState } from 'react'
 import { User, Lock, Ticket, Clock, BarChart3 } from 'lucide-react'
 import { useApp } from '../context'
+import { useAction } from '../hooks/useAction'
 
 export default function Login() {
   const { login } = useApp()
   const [usuario, setUsuario] = useState('')
   const [senha, setSenha] = useState('')
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [run, busy] = useAction()
 
-  const submit = async (e) => {
+  const submit = (e) => {
     e.preventDefault()
-    setBusy(true)
-    setError('')
-    try {
-      await login({ usuario, senha })
-    } catch (err) {
-      setError(err.message)
-      setBusy(false)
-    }
+    return run(async () => {
+      setError('')
+      try {
+        await login({ usuario, senha })
+      } catch (err) {
+        setError(err.message)
+      }
+    })
   }
 
   return (

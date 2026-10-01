@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context'
 import * as api from '../services/api'
 import { invalidateDashboard } from '../queryClient'
+import { useAction } from '../hooks/useAction'
 
 export default function NewRequest() {
   const { notify } = useApp()
@@ -10,7 +11,7 @@ export default function NewRequest() {
   const [categories, setCategories] = useState([])
   const [f, setF] = useState({ title: '', categoryId: '', description: '' })
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [run, busy] = useAction()
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
 
   useEffect(() => {
@@ -23,19 +24,19 @@ export default function NewRequest() {
       .catch((e) => setError(e.message))
   }, [])
 
-  const submit = async (e) => {
+  const submit = (e) => {
     e.preventDefault()
-    setBusy(true)
-    setError('')
-    try {
-      const created = await api.createRequest(f)
-      invalidateDashboard()
-      notify(`Solicitação #${String(created.id).padStart(4, '0')} criada com sucesso`)
-      nav(`/solicitacoes/${created.id}`)
-    } catch (err) {
-      setError(err.message)
-      setBusy(false)
-    }
+    return run(async () => {
+      setError('')
+      try {
+        const created = await api.createRequest(f)
+        invalidateDashboard()
+        notify(`Solicitação #${String(created.id).padStart(4, '0')} criada com sucesso`)
+        nav(`/solicitacoes/${created.id}`)
+      } catch (err) {
+        setError(err.message)
+      }
+    })
   }
 
   return (

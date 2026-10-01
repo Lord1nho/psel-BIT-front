@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { m } from 'motion/react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Inbox, Loader, CheckCircle2, Layers, TrendingUp } from 'lucide-react'
 import {
@@ -9,6 +10,10 @@ import {
 import { useApp } from '../context'
 import { STATUS } from '../data/mock'
 import * as api from '../services/api'
+import { Stagger, Group, Reveal } from '../motion/Reveal'
+import { item } from '../motion/variants'
+
+const MLink = m.create(Link)
 
 const TOTAL_COLOR = '#1E2A78'
 const GROUPING = { dia: 'dia', semana: 'semana', mes: 'mês' }
@@ -39,7 +44,7 @@ function Kpi({ to, color, icon: Icon, label, description, value, total }) {
   const n = useCountUp(value)
   const pct = total ? Math.round((value / total) * 100) : 0
   return (
-    <Link to={to} className="card kpi-lg" style={{ '--c': color }}>
+    <MLink to={to} variants={item} className="card kpi-lg" style={{ '--c': color }}>
       <div className="kpi-top">
         <span className="kpi-icon"><Icon size={22} /></span>
         <span className="kpi-pct">{pct}% do total</span>
@@ -48,7 +53,7 @@ function Kpi({ to, color, icon: Icon, label, description, value, total }) {
       <h4>{label}</h4>
       <p className="muted">{description}</p>
       <div className="meter"><i style={{ width: `${pct}%` }} /></div>
-    </Link>
+    </MLink>
   )
 }
 
@@ -133,7 +138,7 @@ export default function Dashboard() {
       <div className="card dash-filters">
         <div className="chips">
           {[['tudo', 'Tudo'], ['30d', '30 dias'], ['7d', '7 dias']].map(([k, l]) => (
-            <button key={k} className={periodo === k ? 'chip active' : 'chip'} onClick={() => pickPreset(k)}>{l}</button>
+            <button key={k} className={periodo === k ? 'chip active' : 'chip'} onClick={() => pickPreset(k)} disabled={isFetching}>{l}</button>
           ))}
         </div>
         <label className="date-field">De <input type="date" value={shownFrom} max={shownTo || undefined} onChange={pickDate(setDataInicio)} /></label>
@@ -145,7 +150,7 @@ export default function Dashboard() {
         {isAgent && (
           <div className="chips">
             {[['geral', 'Geral'], ['meus', 'Meus']].map(([k, l]) => (
-              <button key={k} className={escopo === k ? 'chip active' : 'chip'} onClick={() => setEscopo(k)}>{l}</button>
+              <button key={k} className={escopo === k ? 'chip active' : 'chip'} onClick={() => setEscopo(k)} disabled={isFetching}>{l}</button>
             ))}
           </div>
         )}
@@ -158,26 +163,26 @@ export default function Dashboard() {
           {[0, 1, 2, 3].map((i) => <div key={i} className="card skeleton" style={{ height: 190 }} />)}
         </div>
       ) : data ? (
-        <div className={isFetching ? 'dash loading' : 'dash'}>
-          <div className="grid kpis4">
+        <Stagger className={isFetching ? 'dash loading' : 'dash'}>
+          <Group className="grid kpis4">
             <Kpi to={listLink()} color={TOTAL_COLOR} icon={Layers} label="Total de solicitações" description="Todas as solicitações registradas no período" value={t.total} total={t.total} />
             <Kpi to={listLink('ABERTO')} color={STATUS.ABERTO.color} icon={Inbox} label="Abertas" description="Aguardando o primeiro atendimento" value={t.abertas} total={t.total} />
             <Kpi to={listLink('EM_ATENDIMENTO')} color={STATUS.EM_ATENDIMENTO.color} icon={Loader} label="Em atendimento" description="Sendo tratadas por um atendente" value={t.emAtendimento} total={t.total} />
             <Kpi to={listLink('CONCLUIDO')} color={STATUS.CONCLUIDO.color} icon={CheckCircle2} label="Concluídas" description="Demandas resolvidas e encerradas" value={t.concluidas} total={t.total} />
-          </div>
+          </Group>
           {data.escopo === 'meus' && (
-            <p className="muted note">No escopo "Meus", Abertas é sempre 0: um chamado aberto ainda não tem atendente.</p>
+            <m.p variants={item} className="muted note">No escopo "Meus", Abertas é sempre 0: um chamado aberto ainda não tem atendente.</m.p>
           )}
 
           {t.total === 0 ? (
-            <div className="card empty">
+            <Reveal className="card empty">
               <Inbox size={40} />
               <h3>Sem solicitações no período</h3>
               <p className="muted">Ajuste o período, o setor ou o escopo para ver os gráficos.</p>
-            </div>
+            </Reveal>
           ) : (
             <>
-              <section className="card rate">
+              <m.section variants={item} className="card rate">
                 <TrendingUp size={22} />
                 <div className="grow">
                   <h3>Taxa de conclusão</h3>
@@ -185,10 +190,10 @@ export default function Dashboard() {
                   <div className="meter big"><i style={{ width: `${rate}%` }} /></div>
                 </div>
                 <strong>{rate}%</strong>
-              </section>
+              </m.section>
 
-              <div className="grid two">
-                <section className="card">
+              <Group className="grid two">
+                <m.section variants={item} className="card">
                   <h3>Distribuição por status</h3>
                   <div className="chart">
                     <ResponsiveContainer>
@@ -202,9 +207,9 @@ export default function Dashboard() {
                     </ResponsiveContainer>
                     <div className="donut-center"><strong>{t.total}</strong><span>total</span></div>
                   </div>
-                </section>
+                </m.section>
 
-                <section className="card">
+                <m.section variants={item} className="card">
                   <h3>Solicitações por setor</h3>
                   <p className="muted hint">Clique numa barra para filtrar pelo setor</p>
                   <div className="chart short">
@@ -221,10 +226,10 @@ export default function Dashboard() {
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
-                </section>
-              </div>
+                </m.section>
+              </Group>
 
-              <section className="card">
+              <m.section variants={item} className="card">
                 <h3>Evolução por {GROUPING[grouping]}</h3>
                 <div className="chart tall">
                   <ResponsiveContainer>
@@ -245,10 +250,10 @@ export default function Dashboard() {
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-              </section>
+              </m.section>
             </>
           )}
-        </div>
+        </Stagger>
       ) : null}
     </>
   )

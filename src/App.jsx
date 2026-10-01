@@ -1,4 +1,5 @@
 import { CheckCircle2 } from 'lucide-react'
+import { AnimatePresence, m } from 'motion/react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppProvider, useApp } from './context'
 import Layout from './components/Layout'
@@ -10,10 +11,21 @@ import RequestDetail from './pages/RequestDetail'
 
 function Routing() {
   const { user, isAgent, toast } = useApp()
-  const toastEl = toast && (
-    <div className="toast">
-      <CheckCircle2 size={18} /> {toast}
-    </div>
+  const toastEl = (
+    <AnimatePresence>
+      {toast && (
+        <m.div
+          key="toast"
+          className="toast"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 16 }}
+          transition={{ duration: 0.2 }}
+        >
+          <CheckCircle2 size={18} /> {toast}
+        </m.div>
+      )}
+    </AnimatePresence>
   )
   if (!user)
     return (
