@@ -17,7 +17,14 @@ const toListItem = (r) => ({
   updatedAt: r.ultimaAtualizacao,
 })
 
+// O detalhe ainda não devolve `atendente` (só a listagem). Enquanto isso, o responsável é o último
+// atendente que colocou a solicitação em atendimento, lido do histórico. Quando a API enviar
+// `atendente` no detalhe, ele passa a valer automaticamente.
+const assigneeFromHistory = (history = []) =>
+  [...history].reverse().find((h) => h.statusNovo === 'EM_ATENDIMENTO')?.usuario?.nome ?? null
+
 const toDetail = (r) => ({
+  assignee: r.atendente?.nome ?? assigneeFromHistory(r.historico),
   id: r.codigo,
   title: r.titulo,
   description: r.descricao,

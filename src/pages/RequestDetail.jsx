@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, MessageSquare, Circle, Clock, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, MessageSquare, Circle, Clock, Pencil, Trash2, Ban } from 'lucide-react'
 import { useApp } from '../context'
 import { STATUS, PRIORITY } from '../data/mock'
 import * as api from '../services/api'
@@ -66,7 +66,7 @@ export default function RequestDetail() {
       try {
         const updated = await api.updateRequest(r.id, patch)
         invalidateDashboard()
-        setR({ ...r, ...updated, requester: r.requester, history: r.history })
+        setR({ ...r, ...updated, requester: r.requester, assignee: r.assignee, history: r.history })
         setEditing(false)
         notify('Solicitação atualizada')
       } catch (err) {
@@ -197,14 +197,31 @@ export default function RequestDetail() {
 
         <aside className="card side">
           <h3>{isAgent ? 'Gerenciar' : 'Detalhes'}</h3>
-          <label className="field">
-            Status
-            <select disabled={!isAgent || busy || r.status === 'CONCLUIDO'} value={selected} onChange={(e) => setNewStatus(e.target.value)}>
-              {Object.entries(STATUS).map(([k, s]) => (
-                <option key={k} value={k} disabled={k !== r.status && !isAhead(k)}>{s.label}</option>
-              ))}
-            </select>
-          </label>
+          <div className="field">
+            <label htmlFor="req-status">Status</label>
+            {/* Para quem não é atendente: cursor de "não permitido" e um aviso ao passar o mouse (ou focar) */}
+            <div
+              className={isAgent ? 'tip-wrap' : 'tip-wrap blocked'}
+              tabIndex={isAgent ? undefined : 0}
+              aria-describedby={isAgent ? undefined : 'status-tip'}
+            >
+              <select
+                id="req-status"
+                disabled={!isAgent || busy || r.status === 'CONCLUIDO'}
+                value={selected}
+                onChange={(e) => setNewStatus(e.target.value)}
+              >
+                {Object.entries(STATUS).map(([k, s]) => (
+                  <option key={k} value={k} disabled={k !== r.status && !isAhead(k)}>{s.label}</option>
+                ))}
+              </select>
+              {!isAgent && (
+                <span id="status-tip" role="tooltip" className="tip">
+                  <Ban size={14} /> Apenas atendentes podem alterar o status
+                </span>
+              )}
+            </div>
+          </div>
           {isAgent && (
             <button className="btn primary block" onClick={saveStatus} disabled={!dirty || busy}>
               {busy ? 'Salvando...' : 'Salvar status'}
@@ -217,12 +234,14 @@ export default function RequestDetail() {
               {Object.entries(PRIORITY).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}
             </select>
           </label>
-          <label className="field">
+          <div className="field">
             Responsável
-            <select disabled value="" title="Disponível em breve">
-              <option value="">Não atribuída</option>
-            </select>
-          </label>
+            {r.assignee ? (
+              <span className="field-value row"><Avatar name={r.assignee} size={24} /> {r.assignee}</span>
+            ) : (
+              <span className="field-value muted">Sem atendente</span>
+            )}
+          </div>
           <hr />
           <dl>
             <dt>Solicitante</dt>
