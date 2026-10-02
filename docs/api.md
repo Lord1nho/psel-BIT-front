@@ -201,4 +201,38 @@ Erros: **400** (status fora do enum); **403** (perfil SOLICITANTE); **404**; **4
 
 ## 10. Dashboard
 
-Em breve (UC07).
+### `GET /dashboard` (SOLICITANTE e ATENDENTE)
+
+Uma única rota alimenta os painéis numéricos e os gráficos. Tudo na resposta obedece ao período escolhido, e o escopo vem do token: o solicitante vê só as próprias solicitações; o atendente vê todas (ou só as que assumiu).
+
+Query (todos opcionais, combináveis):
+
+| Parâmetro | Valores | Observação |
+|---|---|---|
+| `periodo` | `tudo` (padrão), `30d`, `7d` | `7d`/`30d` = hoje e os 6/29 dias anteriores. `tudo` = da primeira solicitação até hoje. |
+| `dataInicio`, `dataFim` | `AAAA-MM-DD` | Período personalizado, ambos inclusivos. **Não combine com `periodo`** (400). Com só um deles, o outro assume (início = primeira solicitação; fim = hoje). |
+| `categoriaId` | inteiro | Filtra por setor. |
+| `agrupamento` | `auto` (padrão), `dia`, `semana`, `mes` | `auto`: até 62 dias por dia; até 364 por semana; acima disso por mês. Máximo de 400 pontos na série (400 se passar). |
+| `escopo` | `geral` (padrão), `meus` | Só atendente (solicitante recebe 400). `meus` = chamados que ele assumiu. |
+| `fuso` | nome IANA, padrão `America/Sao_Paulo` | Define onde começa e termina cada dia. |
+
+**200**
+```json
+{
+  "periodo": { "tipo": "30d", "dataInicio": "2026-09-01", "dataFim": "2026-09-30", "agrupamento": "dia", "fuso": "America/Sao_Paulo" },
+  "escopo": "geral",
+  "totais": { "total": 120, "abertas": 40, "emAtendimento": 30, "concluidas": 50 },
+  "porStatus": [ { "status": "ABERTO", "total": 40 }, { "status": "EM_ATENDIMENTO", "total": 30 }, { "status": "CONCLUIDO", "total": 50 } ],
+  "porCategoria": [ { "categoriaId": 1, "nome": "TI", "total": 60, "abertas": 20, "emAtendimento": 15, "concluidas": 25 } ],
+  "serie": [ { "data": "2026-09-01", "criadas": 4, "concluidas": 2 } ]
+}
+```
+
+- `periodo`: intervalo realmente usado (subtítulo dos gráficos e preenchimento do filtro de datas no "Tudo"). `tipo` é `tudo`, `30d`, `7d` ou `personalizado`.
+- `escopo`: `proprias` (solicitante), `geral` ou `meus` (atendente).
+- `totais`: os 4 painéis numéricos. `porStatus`: sempre os 3 status (zero incluído). `porCategoria`: todas as categorias ativas, mesmo com zero (com `categoriaId` vem só a escolhida). `serie`: linha do tempo sem lacunas; em `semana`, `data` é a segunda-feira; em `mes`, o dia 1.
+- Uma solicitação pertence ao período pela data de criação, e todos os blocos usam a mesma coleção: `sum(serie.criadas) = totais.total` e `sum(porCategoria.total) = totais.total`.
+- Em `escopo=meus`, `abertas` é sempre 0 (chamado aberto ainda não tem atendente).
+- Resposta com `Cache-Control: private, no-cache` e `ETag`: o navegador revalida a cada chamada e recebe 304 se nada mudou.
+
+Erros: **400** para `periodo`/`agrupamento`/`escopo` fora dos valores, `periodo` junto de datas, data inexistente, `dataInicio` maior que `dataFim`, `categoriaId` não numérico, fuso inválido, parâmetro desconhecido, série com mais de 400 pontos ou `escopo` enviado por solicitante; **401** sem token.

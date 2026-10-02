@@ -1,23 +1,25 @@
 import { useState } from 'react'
-import { Mail, Lock, Ticket, Clock, BarChart3 } from 'lucide-react'
+import { User, Lock, Ticket, Clock, BarChart3 } from 'lucide-react'
 import { useApp } from '../context'
+import { useAction } from '../hooks/useAction'
 
 export default function Login() {
   const { login } = useApp()
-  const [email, setEmail] = useState('')
+  const [usuario, setUsuario] = useState('')
+  const [senha, setSenha] = useState('')
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [run, busy] = useAction()
 
-  const submit = async (e) => {
+  const submit = (e) => {
     e.preventDefault()
-    setBusy(true)
-    setError('')
-    try {
-      await login({ email })
-    } catch (err) {
-      setError(err.message)
-      setBusy(false)
-    }
+    return run(async () => {
+      setError('')
+      try {
+        await login({ usuario, senha })
+      } catch (err) {
+        setError(err.message)
+      }
+    })
   }
 
   return (
@@ -48,17 +50,17 @@ export default function Login() {
           <p className="muted">Entre com suas credenciais corporativas.</p>
 
           <label className="field">
-            E-mail
+            Usuário
             <span className="input-icon">
-              <Mail size={16} />
-              <input type="email" required placeholder="voce@empresa.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <User size={16} />
+              <input required autoComplete="username" placeholder="seu.usuario" value={usuario} onChange={(e) => setUsuario(e.target.value)} />
             </span>
           </label>
           <label className="field">
             Senha
             <span className="input-icon">
               <Lock size={16} />
-              <input type="password" required placeholder="••••••••" />
+              <input type="password" required autoComplete="current-password" placeholder="••••••••" value={senha} onChange={(e) => setSenha(e.target.value)} />
             </span>
           </label>
 
@@ -66,10 +68,6 @@ export default function Login() {
           <button className="btn primary block" disabled={busy}>
             {busy ? 'Entrando...' : 'Entrar'}
           </button>
-          <p className="muted center demo">
-            Protótipo — use <a href="#" onClick={(e) => { e.preventDefault(); setEmail('solicitante@bit.com') }}>solicitante@bit.com</a> ou{' '}
-            <a href="#" onClick={(e) => { e.preventDefault(); setEmail('atendente@bit.com') }}>atendente@bit.com</a> (qualquer senha)
-          </p>
         </form>
       </section>
     </div>

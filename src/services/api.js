@@ -1,74 +1,120 @@
-// Camada de acesso a dados. Hoje responde com dados mockados em memória;
-// para integrar a API real, basta trocar o corpo de cada função por um fetch/axios
-// mantendo a mesma assinatura e o mesmo formato de retorno.
-import { INITIAL_REQUESTS, MOCK_USERS, AGENTS } from '../data/mock'
+// Camada de acesso à API (contrato em docs/api.md). Converte os payloads em
+// português da API para o formato usado pelas telas.
+import { request, session } from './http'
 
-// const BASE_URL = import.meta.env.VITE_API_URL
-const delay = (ms = 250) => new Promise((r) => setTimeout(r, ms))
+const toUser = (u) => ({ id: u.id, name: u.nome, username: u.usuario, role: u.perfil })
 
-let db = structuredClone(INITIAL_REQUESTS)
+const toListItem = (r) => ({
+  id: r.codigo,
+  title: r.titulo,
+  status: r.status,
+  createdAt: r.dataCriacao,
+  category: r.categoria?.nome,
+  requester: r.solicitante?.nome,
+  requesterId: r.solicitante?.id,
+  assignee: r.atendente?.nome ?? null,
+  assigneeId: r.atendente?.id ?? null,
+  updatedAt: r.ultimaAtualizacao,
+})
 
-/** POST /auth/login -> { name, email, role: 'solicitante' | 'atendente' } */
-export async function login({ email }) {
-  await delay()
-  const user = MOCK_USERS.find((u) => u.email === email.trim().toLowerCase())
-  if (!user) throw new Error('Usuário não encontrado')
+// O detalhe ainda não devolve `atendente` (só a listagem). Enquanto isso, o responsável é o último
+// atendente que colocou a solicitação em atendimento, lido do histórico. Quando a API enviar
+// `atendente` no detalhe, ele passa a valer automaticamente.
+const assigneeFromHistory = (history = []) =>
+  [...history].reverse().find((h) => h.statusNovo === 'EM_ATENDIMENTO')?.usuario?.nome ?? null
+
+const toDetail = (r) => ({
+  assignee: r.atendente?.nome ?? assigneeFromHistory(r.historico),
+  id: r.codigo,
+  title: r.titulo,
+  description: r.descricao,
+  status: r.status,
+  createdAt: r.dataCriacao,
+  categoryId: r.categoriaId,
+  category: r.categoria?.nome,
+  requesterId: r.usuarioId,
+  requester: r.solicitante?.nome,
+  history: (r.historico || []).map((h) => ({
+    from: h.statusAnterior,
+    to: h.statusNovo,
+    at: h.dataAlteracao,
+    author: h.usuario?.nome,
+  })),
+})
+
+/** POST /auth/login */
+export async function login({ usuario, senha }) {
+  const data = await request('/auth/login', { method: 'POST', body: { usuario, senha }, auth: false })
+  const user = toUser(data.usuario)
+  session.set({ accessToken: data.accessToken, user })
   return user
 }
 
-/** GET /requests -> Request[] */
-export async function getRequests() {
-  await delay()
-  return structuredClone(db)
-}
-
-/** GET /agents -> string[] (atendentes disponíveis para atribuição) */
-export async function getAgents() {
-  await delay(100)
-  return AGENTS
-}
-
-/** POST /requests -> Request */
-export async function createRequest(data, user) {
-  await delay()
-  const now = new Date().toISOString()
-  const req = {
-    ...data,
-    id: Math.max(0, ...db.map((r) => r.id)) + 1,
-    status: 'aberta',
-    assignee: null,
-    requester: user.name,
-    createdAt: now,
-    history: [{ type: 'event', author: user.name, text: 'abriu a solicitação', at: now }],
+/** POST /auth/logout — stateless: o token é apenas descartado localmente. */
+export async function logout() {
+  try {
+    await request('/auth/logout', { method: 'POST' })
+  } catch {
+    // o token é descartado de qualquer forma
+  } finally {
+    session.clear()
   }
-  db = [req, ...db]
-  return structuredClone(req)
 }
 
-/** PATCH /requests/:id -> Request */
-export async function updateRequest(id, patch, eventText, user) {
-  await delay(150)
-  db = db.map((r) =>
-    r.id === id
-      ? {
-          ...r,
-          ...patch,
-          history: eventText
-            ? [...r.history, { type: 'event', author: user.name, text: eventText, at: new Date().toISOString() }]
-            : r.history,
-        }
-      : r,
-  )
-  return structuredClone(db.find((r) => r.id === id))
+/** GET /categorias */
+export const getCategories = () => request('/categorias')
+
+/** GET /solicitacoes — filtros: status, categoryId, q, from, to (AAAA-MM-DD) */
+export async function listRequests({ status, categoryId, q, from, to } = {}) {
+  const data = await request('/solicitacoes', {
+    query: { status, categoriaId: categoryId, q: q?.trim(), dataInicio: from, dataFim: to },
+  })
+  return data.map(toListItem)
 }
 
-/** POST /requests/:id/comments -> Request */
-export async function addComment(id, text, user) {
-  await delay(150)
-  db = db.map((r) =>
-    r.id === id
-      ? { ...r, history: [...r.history, { type: 'comment', author: user.name, text, at: new Date().toISOString() }] }
-      : r,
-  )
-  return structuredClone(db.find((r) => r.id === id))
+/** GET /solicitacoes/:codigo */
+export const getRequest = async (id) => toDetail(await request(`/solicitacoes/${id}`))
+
+/** POST /solicitacoes */
+export async function createRequest({ title, description, categoryId }) {
+  const data = await request('/solicitacoes', {
+    method: 'POST',
+    body: { titulo: title, descricao: description, categoriaId: Number(categoryId) },
+  })
+  return toDetail(data)
+}
+
+/** PATCH /solicitacoes/:codigo — envia apenas os campos alterados */
+export async function updateRequest(id, { title, description, categoryId }) {
+  const body = {}
+  if (title !== undefined) body.titulo = title
+  if (description !== undefined) body.descricao = description
+  if (categoryId !== undefined) body.categoriaId = Number(categoryId)
+  return toDetail(await request(`/solicitacoes/${id}`, { method: 'PATCH', body }))
+}
+
+/** DELETE /solicitacoes/:codigo */
+export const deleteRequest = (id) => request(`/solicitacoes/${id}`, { method: 'DELETE' })
+
+/** PATCH /solicitacoes/:codigo/status — ATENDENTE; sequência ABERTO → EM_ATENDIMENTO → CONCLUIDO */
+export const updateStatus = (id, status) => request(`/solicitacoes/${id}/status`, { method: 'PATCH', body: { status } })
+
+/**
+ * GET /dashboard — SOLICITANTE (só as próprias) e ATENDENTE (todas, ou `escopo: 'meus'`).
+ * Filtros: `periodo` ('tudo' | '30d' | '7d') OU `dataInicio`/`dataFim` (nunca os dois),
+ * `categoriaId`, `agrupamento` ('auto' | 'dia' | 'semana' | 'mes'), `escopo` ('geral' | 'meus').
+ * Retorna o payload da API sem adaptação.
+ */
+export function getDashboard({ periodo, dataInicio, dataFim, categoriaId, agrupamento, escopo } = {}) {
+  const custom = dataInicio || dataFim
+  return request('/dashboard', {
+    query: {
+      periodo: custom ? undefined : periodo,
+      dataInicio,
+      dataFim,
+      categoriaId,
+      agrupamento,
+      escopo,
+    },
+  })
 }
