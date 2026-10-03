@@ -4,6 +4,7 @@ import { Search, PlusCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRi
 import { useApp } from '../context'
 import { STATUS, API_STATUSES } from '../data/mock'
 import * as api from '../services/api'
+import { useCategories } from '../hooks/useCategories'
 import { fmtId, fmtDate, StatusBadge } from '../components/Shared'
 
 const SIZES = [10, 20, 50]
@@ -11,30 +12,29 @@ const SIZES = [10, 20, 50]
 // '' = todos os status (padrão) · ou um único status
 const statusFromUrl = (s) => (API_STATUSES.includes(s) ? s : '')
 
+// 'meus' só existe para o atendente (o solicitante recebe 400 da API)
+const initialAssignee = (a, isAgent) => (a === 'sem' || (a === 'meus' && isAgent) ? a : '')
+
 export default function Requests() {
-  const { isAgent, user } = useApp()
+  const { isAgent } = useApp()
+  const { categories } = useCategories()
   const [params, setParams] = useSearchParams()
   // filtros iniciais vindos da URL (ex.: clique num card do dashboard)
   const [q, setQ] = useState(params.get('q') || '')
   const [debouncedQ, setDebouncedQ] = useState(q)
   const [status, setStatus] = useState(statusFromUrl(params.get('status')))
   const [categoryId, setCategoryId] = useState(params.get('categoriaId') || '')
-  const [assigneeId, setAssigneeId] = useState(/^\d+$/.test(params.get('atendente') || '') ? params.get('atendente') : '')
+  // '' = todos · 'meus' = os que eu assumi (só atendente) · 'sem' = ninguém assumiu
+  const [assignee, setAssignee] = useState(initialAssignee(params.get('atendente'), isAgent))
   const [from, setFrom] = useState(params.get('dataInicio') || '')
   const [to, setTo] = useState(params.get('dataFim') || '')
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(20)
-  const [categories, setCategories] = useState([])
-  const [known, setKnown] = useState({}) // atendentes já vistos nos resultados: { id: nome }
   const [data, setData] = useState(null) // { items, total, page, size, totalPages }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const invalidRange = from && to && to < from
-
-  useEffect(() => {
-    api.getCategories().then(setCategories).catch(() => {})
-  }, [])
 
   // busca dinâmica: debounce de ~300 ms; campo vazio não envia `q`
   useEffect(() => {
@@ -48,30 +48,20 @@ export default function Requests() {
     let cancelled = false
     setLoading(true)
     api
-      .listRequests({ statuses: status || undefined, categoryId, assigneeId, q: debouncedQ, from, to, page, size })
+      .listRequests({ statuses: status || undefined, categoryId, assignee, q: debouncedQ, from, to, page, size })
       .then((r) => {
         if (cancelled) return
         // página além do fim (ex.: depois de mudar um filtro): volta para a última existente
         if (r.items.length === 0 && r.totalPages > 0 && page > r.totalPages) return setPage(r.totalPages)
         setData(r)
         setError('')
-        setKnown((k) => {
-          const next = { ...k }
-          r.items.forEach((i) => i.assigneeId !== null && (next[i.assigneeId] = i.assignee))
-          return next
-        })
       })
       .catch((e) => !cancelled && setError(e.message))
       .finally(() => !cancelled && setLoading(false))
     return () => {
       cancelled = true
     }
-  }, [status, categoryId, assigneeId, debouncedQ, from, to, page, size, invalidRange])
-
-  // "Meus" = o próprio atendente logado, sempre primeiro e com o nome dele; depois os demais já vistos
-  const assignees = Object.entries(known).filter(([id]) => Number(id) !== user.id)
-  if (isAgent) assignees.unshift([String(user.id), user.name])
-  if (assigneeId && !assignees.some(([id]) => id === assigneeId)) assignees.push([assigneeId, 'Atendente selecionado'])
+  }, [status, categoryId, assignee, debouncedQ, from, to, page, size, invalidRange])
 
   const rows = data?.items ?? []
   const total = data?.total ?? 0
@@ -87,7 +77,7 @@ export default function Requests() {
     setQ('')
     setStatus('')
     setCategoryId('')
-    setAssigneeId('')
+    setAssignee('')
     setFrom('')
     setTo('')
     setPage(1)
@@ -126,12 +116,13 @@ export default function Requests() {
               <option key={c.id} value={c.id}>{c.nome}</option>
             ))}
           </select>
-          <select value={assigneeId} onChange={change(setAssigneeId)}>
-            <option value="">{isAgent ? 'Todos (Geral)' : 'Todos os atendentes'}</option>
-            {assignees.map(([id, name]) => (
-              <option key={id} value={id}>{name}</option>
-            ))}
-          </select>
+          {isAgent && (
+            <select value={assignee} onChange={change(setAssignee)} aria-label="Atendimento">
+              <option value="">Todos</option>
+              <option value="meus">Meus atendimentos</option>
+              <option value="sem">Sem atendente</option>
+            </select>
+          )}
           <label className="date-field">
             De <input type="date" value={from} onChange={change(setFrom)} />
           </label>

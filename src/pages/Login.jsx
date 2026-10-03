@@ -1,12 +1,10 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { User, Lock, Ticket, Clock, BarChart3 } from 'lucide-react'
 import { useApp } from '../context'
 import { useAction } from '../hooks/useAction'
 
 export default function Login() {
   const { login } = useApp()
-  const nav = useNavigate()
   const [usuario, setUsuario] = useState('')
   const [senha, setSenha] = useState('')
   const [error, setError] = useState('')
@@ -17,8 +15,7 @@ export default function Login() {
     return run(async () => {
       setError('')
       try {
-        await login({ usuario, senha })
-        nav('/solicitacoes', { replace: true }) // sempre a listagem, nunca /nova nem um chamado específico
+        await login({ usuario, senha }) // o redirecionamento para a listagem é feito em Protected (App.jsx)
       } catch (err) {
         setError(err.message)
       }

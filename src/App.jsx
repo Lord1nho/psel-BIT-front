@@ -1,6 +1,7 @@
 import { CheckCircle2, XCircle } from 'lucide-react'
 import { AnimatePresence, m } from 'motion/react'
-import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import { AppProvider, useApp } from './context'
 import Layout from './components/Layout'
 import Login from './pages/Login'
@@ -40,8 +41,20 @@ function Shell() {
 }
 
 // Apenas usuários autenticados acessam o sistema; sem login, qualquer rota mostra o login
+// Logo após o login o destino é sempre a listagem (nunca /nova nem um chamado). Enquanto isso, nenhuma tela
+// protegida é montada: evita buscar dados (ex.: dashboard) de uma tela que seria trocada em seguida.
+function PostLoginRedirect() {
+  const { pathname } = useLocation()
+  const { clearLoginRedirect } = useApp()
+  useEffect(() => {
+    if (pathname === '/solicitacoes') clearLoginRedirect()
+  }, [pathname, clearLoginRedirect])
+  return pathname === '/solicitacoes' ? null : <Navigate to="/solicitacoes" replace />
+}
+
 function Protected() {
-  const { user, authError, dismissAuthError } = useApp()
+  const { user, authError, dismissAuthError, loginRedirect } = useApp()
+  if (user && loginRedirect) return <PostLoginRedirect />
   if (user) return <Outlet />
   // sessão expirada (401): tela de erro pedindo novo login; depois do login o destino é sempre a listagem
   if (authError) return <ErrorPage variant="unauthorized" fullscreen onAction={dismissAuthError} actionLabel="Fazer login" />

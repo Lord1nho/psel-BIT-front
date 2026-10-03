@@ -17,14 +17,14 @@ const toListItem = (r) => ({
   updatedAt: r.ultimaAtualizacao,
 })
 
-// O detalhe ainda não devolve `atendente` (só a listagem). Enquanto isso, o responsável é o último
-// atendente que colocou a solicitação em atendimento, lido do histórico. Quando a API enviar
-// `atendente` no detalhe, ele passa a valer automaticamente.
+// O detalhe devolve `atendente` ({ id, nome }). O histórico fica como alternativa: respostas de
+// criar/editar não trazem `atendente`, e o responsável é quem colocou o chamado em atendimento.
 const assigneeFromHistory = (history = []) =>
-  [...history].reverse().find((h) => h.statusNovo === 'EM_ATENDIMENTO')?.usuario?.nome ?? null
+  [...history].reverse().find((h) => h.statusNovo === 'EM_ATENDIMENTO')?.usuario ?? null
 
 const toDetail = (r) => ({
-  assignee: r.atendente?.nome ?? assigneeFromHistory(r.historico),
+  assignee: (r.atendente ?? assigneeFromHistory(r.historico))?.nome ?? null,
+  assigneeId: (r.atendente ?? assigneeFromHistory(r.historico))?.id ?? null,
   id: r.codigo,
   title: r.titulo,
   description: r.descricao,
@@ -67,15 +67,16 @@ export const getCategories = () => request('/categorias')
 /**
  * GET /solicitacoes — filtros e paginação no servidor.
  * `statuses`: um ou vários separados por vírgula (ex.: 'ABERTO,EM_ATENDIMENTO'); omitido = todos.
+ * `assignee`: 'meus' (só atendente), 'sem' (ninguém assumiu) ou 'todos'/omitido (sem filtro).
  * `from`/`to`: AAAA-MM-DD. `page` (>= 1) e `size` (1 a 100).
  * Retorna { items, total, page, size, totalPages }.
  */
-export async function listRequests({ statuses, categoryId, assigneeId, q, from, to, page = 1, size = 20 } = {}) {
+export async function listRequests({ statuses, categoryId, assignee, q, from, to, page = 1, size = 20 } = {}) {
   const data = await request('/solicitacoes', {
     query: {
       status: statuses,
       categoriaId: categoryId,
-      atendenteId: assigneeId,
+      atendente: assignee,
       q: q?.trim(),
       dataInicio: from,
       dataFim: to,

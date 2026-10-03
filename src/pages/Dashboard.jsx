@@ -10,12 +10,15 @@ import {
 import { useApp } from '../context'
 import { STATUS } from '../data/mock'
 import * as api from '../services/api'
+import { useCategories } from '../hooks/useCategories'
 import { Stagger, Group, Reveal } from '../motion/Reveal'
 import { item } from '../motion/variants'
 
 const MLink = m.create(Link)
 
 const TOTAL_COLOR = '#1E2A78'
+const REFRESH_MS = 60_000 // atualização automática enquanto a aba está em uso
+const hhmm = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 const GROUPING = { dia: 'dia', semana: 'semana', mes: 'mês' }
 const dmy = (s) => s.slice(8, 10) + '/' + s.slice(5, 7)
 
@@ -58,21 +61,17 @@ function Kpi({ to, color, icon: Icon, label, description, value, total }) {
 }
 
 export default function Dashboard() {
-  const { isAgent, user } = useApp()
+  const { isAgent } = useApp()
+  const { categories } = useCategories()
   // `periodo` e `dataInicio/dataFim` são exclusivos: escolher um limpa o outro
   const [periodo, setPeriodo] = useState('tudo')
   const [dataInicio, setDataInicio] = useState('')
   const [dataFim, setDataFim] = useState('')
   const [categoriaId, setCategoriaId] = useState('')
   const [escopo, setEscopo] = useState('geral')
-  const [categories, setCategories] = useState([])
   const [hidden, setHidden] = useState({})
 
   const invalidRange = dataInicio && dataFim && dataFim < dataInicio
-
-  useEffect(() => {
-    api.getCategories().then(setCategories).catch(() => {})
-  }, [])
 
   const filters = {
     periodo: periodo || undefined,
@@ -81,12 +80,18 @@ export default function Dashboard() {
     categoriaId: categoriaId || undefined,
     escopo: isAgent && escopo === 'meus' ? 'meus' : undefined,
   }
-  const { data, isPending, isFetching, error } = useQuery({
+  const { data, isPending, isPlaceholderData, dataUpdatedAt, error } = useQuery({
     queryKey: ['dashboard', filters],
     queryFn: () => api.getDashboard(filters),
     placeholderData: keepPreviousData,
     enabled: !invalidRange,
+    refetchOnWindowFocus: true, // ao voltar à aba, atualiza se já passou do staleTime (30 s)
+    refetchInterval: REFRESH_MS, // e a cada 60 s...
+    refetchIntervalInBackground: false, // ...mas só com a aba em uso
   })
+  // `isPlaceholderData` só é verdadeiro ao trocar de filtro (dado anterior na tela): as atualizações
+  // automáticas da mesma consulta não esmaecem a tela nem desabilitam os botões
+  const switching = isPlaceholderData
 
   const pickPreset = (p) => {
     setPeriodo(p)
@@ -117,7 +122,7 @@ export default function Dashboard() {
       q.set('dataFim', data.periodo.dataFim)
     }
     if (categoriaId) q.set('categoriaId', categoriaId)
-    if (isAgent && escopo === 'meus') q.set('atendente', String(user.id))
+    if (isAgent && escopo === 'meus') q.set('atendente', 'meus')
     const s = q.toString()
     return '/solicitacoes' + (s ? `?${s}` : '')
   }
@@ -131,6 +136,7 @@ export default function Dashboard() {
           <p className="muted">
             Indicadores de {scopeLabel}
             {data && ` · ${dmy(data.periodo.dataInicio)} a ${dmy(data.periodo.dataFim)}`}
+            {data && !switching && ` · atualizado às ${hhmm(dataUpdatedAt)}`}
           </p>
         </div>
       </div>
@@ -138,7 +144,7 @@ export default function Dashboard() {
       <div className="card dash-filters">
         <div className="chips">
           {[['tudo', 'Tudo'], ['30d', '30 dias'], ['7d', '7 dias']].map(([k, l]) => (
-            <button key={k} className={periodo === k ? 'chip active' : 'chip'} onClick={() => pickPreset(k)} disabled={isFetching}>{l}</button>
+            <button key={k} className={periodo === k ? 'chip active' : 'chip'} onClick={() => pickPreset(k)} disabled={switching}>{l}</button>
           ))}
         </div>
         <label className="date-field">De <input type="date" value={shownFrom} max={shownTo || undefined} onChange={pickDate(setDataInicio)} /></label>
@@ -150,7 +156,7 @@ export default function Dashboard() {
         {isAgent && (
           <div className="chips">
             {[['geral', 'Geral'], ['meus', 'Meus']].map(([k, l]) => (
-              <button key={k} className={escopo === k ? 'chip active' : 'chip'} onClick={() => setEscopo(k)} disabled={isFetching}>{l}</button>
+              <button key={k} className={escopo === k ? 'chip active' : 'chip'} onClick={() => setEscopo(k)} disabled={switching}>{l}</button>
             ))}
           </div>
         )}
@@ -163,7 +169,7 @@ export default function Dashboard() {
           {[0, 1, 2, 3].map((i) => <div key={i} className="card skeleton" style={{ height: 190 }} />)}
         </div>
       ) : data ? (
-        <Stagger className={isFetching ? 'dash loading' : 'dash'}>
+        <Stagger className={switching ? 'dash loading' : 'dash'}>
           <Group className="grid kpis4">
             <Kpi to={listLink()} color={TOTAL_COLOR} icon={Layers} label="Total de solicitações" description="Todas as solicitações registradas no período" value={t.total} total={t.total} />
             <Kpi to={listLink('ABERTO')} color={STATUS.ABERTO.color} icon={Inbox} label="Abertas" description="Aguardando o primeiro atendimento" value={t.abertas} total={t.total} />

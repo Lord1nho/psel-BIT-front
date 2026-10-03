@@ -11,6 +11,7 @@ export function AppProvider({ children }) {
   const [user, setUser] = useState(() => session.get()?.user || null)
   const [toast, setToast] = useState(null) // { msg, type }
   const [failure, setFailure] = useState(null) // { title, message } -> modal de erro global
+  const [loginRedirect, setLoginRedirect] = useState(false) // acabou de logar: ir para a listagem antes de renderizar qualquer tela
   const [authError, setAuthError] = useState(false) // sessão expirada/não autenticado -> tela de erro 401
 
   // Toast de sucesso (verde) por padrão; falhas de ação usam showError (modal)
@@ -31,7 +32,9 @@ export function AppProvider({ children }) {
   }, [])
 
   const login = async (credentials) => {
-    setUser(await api.login(credentials))
+    const authenticated = await api.login(credentials)
+    setLoginRedirect(true) // o destino pós-login é decidido nas rotas (veja Protected em App.jsx)
+    setUser(authenticated)
     setAuthError(false)
   }
   const logout = async () => {
@@ -44,7 +47,7 @@ export function AppProvider({ children }) {
 
   return (
     <Ctx.Provider
-      value={{ user, isAgent, toast, notify, failure, showError, clearError, authError, dismissAuthError: () => setAuthError(false), login, logout }}
+      value={{ user, isAgent, toast, notify, failure, showError, clearError, authError, dismissAuthError: () => setAuthError(false), loginRedirect, clearLoginRedirect: () => setLoginRedirect(false), login, logout }}
     >
       {children}
     </Ctx.Provider>

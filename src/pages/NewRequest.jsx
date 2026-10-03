@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useBlocker, useNavigate } from 'react-router-dom'
 import { useApp } from '../context'
 import * as api from '../services/api'
+import { useCategories } from '../hooks/useCategories'
 import { invalidateDashboard } from '../queryClient'
 import { useAction } from '../hooks/useAction'
 import Modal from '../components/Modal'
@@ -9,17 +10,19 @@ import Modal from '../components/Modal'
 export default function NewRequest() {
   const { notify, showError } = useApp()
   const nav = useNavigate()
-  const [categories, setCategories] = useState([])
+  const { categories, error } = useCategories()
   const [f, setF] = useState({ title: '', categoryId: '', description: '' })
-  const [error, setError] = useState('')
   const [run, busy] = useAction()
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
+
+  // categoria padrão = a primeira da lista, enquanto o usuário não escolher outra (sem efeito/estado extra)
+  const categoryId = f.categoryId || (categories[0]?.id ?? '')
 
   // Validação no front (espelha as regras da API: textos não vazios e assunto até 255 caracteres)
   const [touched, setTouched] = useState({})
   const errors = {
     title: f.title.trim() ? '' : 'Informe o assunto da solicitação.',
-    categoryId: f.categoryId ? '' : 'Selecione uma categoria.',
+    categoryId: categoryId ? '' : 'Selecione uma categoria.',
     description: f.description.trim() ? '' : 'Descreva a solicitação.',
   }
   const valid = !errors.title && !errors.categoryId && !errors.description
@@ -46,23 +49,12 @@ export default function NewRequest() {
     return () => window.removeEventListener('beforeunload', warn)
   }, [dirty])
 
-  useEffect(() => {
-    api
-      .getCategories()
-      .then((c) => {
-        setCategories(c)
-        setF((prev) => ({ ...prev, categoryId: c[0]?.id ?? '' }))
-      })
-      .catch((e) => setError(e.message))
-  }, [])
-
   const submit = (e) => {
     e.preventDefault()
     if (!valid) return setTouched({ title: true, categoryId: true, description: true })
     return run(async () => {
-      setError('')
       try {
-        const created = await api.createRequest({ ...f, title: f.title.trim(), description: f.description.trim() })
+        const created = await api.createRequest({ ...f, categoryId, title: f.title.trim(), description: f.description.trim() })
         invalidateDashboard()
         allowLeave.current = true
         notify(`Solicitação #${String(created.id).padStart(4, '0')} criada com sucesso`)
@@ -108,7 +100,7 @@ export default function NewRequest() {
           <select
             id="req-category"
             required
-            value={f.categoryId}
+            value={categoryId}
             onChange={set('categoryId')}
             onBlur={touch('categoryId')}
             aria-invalid={!!shown('categoryId')}
@@ -135,7 +127,7 @@ export default function NewRequest() {
           />
           {shown('description') && <span className="field-error">{shown('description')}</span>}
         </div>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{error.message}</p>}
         <div className="row end">
           {!valid && !busy && <span className="muted form-hint">Preencha os campos obrigatórios para enviar.</span>}
           <button type="button" className="btn ghost" onClick={() => nav(-1)}>Cancelar</button>
