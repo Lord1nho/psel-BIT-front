@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { User, Lock, Ticket, Clock, BarChart3 } from 'lucide-react'
 import { useApp } from '../context'
 import { useAction } from '../hooks/useAction'
+import { LOGIN_MAX, cleanLine } from '../utils/requestValidation'
 
 export default function Login() {
   const { login } = useApp()
@@ -15,7 +16,7 @@ export default function Login() {
     return run(async () => {
       setError('')
       try {
-        await login({ usuario, senha }) // o redirecionamento para a listagem é feito em Protected (App.jsx)
+        await login({ usuario: usuario.trim(), senha }) // o redirecionamento para a listagem é feito em Protected (App.jsx)
       } catch (err) {
         setError(err.message)
       }
@@ -53,14 +54,14 @@ export default function Login() {
             Usuário
             <span className="input-icon">
               <User size={16} />
-              <input required autoComplete="username" placeholder="seu.usuario" value={usuario} onChange={(e) => setUsuario(e.target.value)} />
+              <input required maxLength={LOGIN_MAX} autoComplete="username" placeholder="seu.usuario" value={usuario} onChange={(e) => setUsuario(cleanLine(e.target.value))} />
             </span>
           </label>
           <label className="field">
             Senha
             <span className="input-icon">
               <Lock size={16} />
-              <input type="password" required autoComplete="current-password" placeholder="••••••••" value={senha} onChange={(e) => setSenha(e.target.value)} />
+              <input type="password" required maxLength={LOGIN_MAX} autoComplete="current-password" placeholder="••••••••" value={senha} onChange={(e) => setSenha(e.target.value)} />
             </span>
           </label>
 
