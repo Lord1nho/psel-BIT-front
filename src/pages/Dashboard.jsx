@@ -59,7 +59,7 @@ function Kpi({ to, color, icon: Icon, label, description, value, total }) {
 }
 
 export default function Dashboard() {
-  const { isAgent, user } = useApp()
+  const { isAgent } = useApp()
   const { categories } = useCategories()
   // `periodo` e `dataInicio/dataFim` são exclusivos: escolher um limpa o outro
   const [periodo, setPeriodo] = useState('tudo')
@@ -114,7 +114,7 @@ export default function Dashboard() {
       q.set('dataFim', data.periodo.dataFim)
     }
     if (categoriaId) q.set('categoriaId', categoriaId)
-    if (isAgent && escopo === 'meus') q.set('atendente', String(user.id))
+    if (isAgent && escopo === 'meus') q.set('atendente', 'meus')
     const s = q.toString()
     return '/solicitacoes' + (s ? `?${s}` : '')
   }

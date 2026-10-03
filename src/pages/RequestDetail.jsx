@@ -48,6 +48,12 @@ export default function RequestDetail() {
   if (!r) return <p className="muted">Carregando...</p>
 
   // o servidor valida de qualquer forma; aqui só decidimos o que mostrar
+  // Quem pode mexer no status: só atendente; e, depois que alguém assumiu, só o responsável (o servidor responde 403 aos demais)
+  const statusBlock = !isAgent
+    ? 'Apenas atendentes podem alterar o status'
+    : r.status === 'EM_ATENDIMENTO' && r.assigneeId && r.assigneeId !== user.id
+      ? `Somente ${r.assignee} pode alterar o status deste chamado`
+      : ''
   const canManage = !isAgent && r.status === 'ABERTO' && r.requesterId === user.id
 
   const startEdit = async () => {
@@ -66,7 +72,7 @@ export default function RequestDetail() {
       try {
         const updated = await api.updateRequest(r.id, patch)
         invalidateDashboard()
-        setR({ ...r, ...updated, requester: r.requester, assignee: r.assignee, history: r.history })
+        setR({ ...r, ...updated, requester: r.requester, assignee: r.assignee, assigneeId: r.assigneeId, history: r.history })
         setEditing(false)
         notify('Solicitação atualizada')
       } catch (err) {
@@ -201,13 +207,13 @@ export default function RequestDetail() {
             <label htmlFor="req-status">Status</label>
             {/* Para quem não é atendente: cursor de "não permitido" e um aviso ao passar o mouse (ou focar) */}
             <div
-              className={isAgent ? 'tip-wrap' : 'tip-wrap blocked'}
-              tabIndex={isAgent ? undefined : 0}
-              aria-describedby={isAgent ? undefined : 'status-tip'}
+              className={statusBlock ? 'tip-wrap blocked' : 'tip-wrap'}
+              tabIndex={statusBlock ? 0 : undefined}
+              aria-describedby={statusBlock ? 'status-tip' : undefined}
             >
               <select
                 id="req-status"
-                disabled={!isAgent || busy || r.status === 'CONCLUIDO'}
+                disabled={!!statusBlock || busy || r.status === 'CONCLUIDO'}
                 value={selected}
                 onChange={(e) => setNewStatus(e.target.value)}
               >
@@ -215,9 +221,9 @@ export default function RequestDetail() {
                   <option key={k} value={k} disabled={k !== r.status && !isAhead(k)}>{s.label}</option>
                 ))}
               </select>
-              {!isAgent && (
+              {statusBlock && (
                 <span id="status-tip" role="tooltip" className="tip">
-                  <Ban size={14} /> Apenas atendentes podem alterar o status
+                  <Ban size={14} /> {statusBlock}
                 </span>
               )}
             </div>
