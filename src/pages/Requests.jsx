@@ -5,6 +5,7 @@ import { useApp } from '../context'
 import { STATUS, API_STATUSES } from '../data/mock'
 import * as api from '../services/api'
 import { useCategories } from '../hooks/useCategories'
+import { SEARCH_MAX, cleanLine, searchFromUrl, idFromUrl, dateFromUrl } from '../utils/requestValidation'
 import { fmtId, fmtDate, StatusBadge } from '../components/Shared'
 
 const SIZES = [10, 20, 50]
@@ -20,14 +21,14 @@ export default function Requests() {
   const { categories } = useCategories()
   const [params, setParams] = useSearchParams()
   // filtros iniciais vindos da URL (ex.: clique num card do dashboard)
-  const [q, setQ] = useState(params.get('q') || '')
+  const [q, setQ] = useState(searchFromUrl(params.get('q')))
   const [debouncedQ, setDebouncedQ] = useState(q)
   const [status, setStatus] = useState(statusFromUrl(params.get('status')))
-  const [categoryId, setCategoryId] = useState(params.get('categoriaId') || '')
+  const [categoryId, setCategoryId] = useState(idFromUrl(params.get('categoriaId')))
   // '' = todos · 'meus' = os que eu assumi (só atendente) · 'sem' = ninguém assumiu
   const [assignee, setAssignee] = useState(initialAssignee(params.get('atendente'), isAgent))
-  const [from, setFrom] = useState(params.get('dataInicio') || '')
-  const [to, setTo] = useState(params.get('dataFim') || '')
+  const [from, setFrom] = useState(dateFromUrl(params.get('dataInicio')))
+  const [to, setTo] = useState(dateFromUrl(params.get('dataFim')))
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(20)
   const [data, setData] = useState(null) // { items, total, page, size, totalPages }
@@ -102,7 +103,7 @@ export default function Requests() {
         <div className="filters">
           <label className="search grow">
             <Search size={16} />
-            <input placeholder="Buscar por título, solicitante ou código" maxLength={100} value={q} onChange={change(setQ)} />
+            <input placeholder="Buscar por título, solicitante ou código" maxLength={SEARCH_MAX} value={q} onChange={(e) => { setQ(cleanLine(e.target.value)); setPage(1) }} />
           </label>
           <select value={status} onChange={change(setStatus)}>
             <option value="">Todos os status</option>

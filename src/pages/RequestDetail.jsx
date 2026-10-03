@@ -10,6 +10,8 @@ import { useAction } from '../hooks/useAction'
 import { fmtId, fmtDate, StatusBadge, Avatar } from '../components/Shared'
 import Modal from '../components/Modal'
 import ErrorPage from '../components/ErrorPage'
+import RequestFields from '../components/RequestFields'
+import { cleanLine, cleanText, validateRequest } from '../utils/requestValidation'
 
 export default function RequestDetail() {
   const { id } = useParams()
@@ -20,6 +22,7 @@ export default function RequestDetail() {
   const [editing, setEditing] = useState(false)
   const { categories } = useCategories({ enabled: editing }) // só busca ao editar; depois vem do cache
   const [form, setForm] = useState({})
+  const [touchedEdit, setTouchedEdit] = useState({})
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [run, busy] = useAction()
   const [newStatus, setNewStatus] = useState(null)
@@ -58,14 +61,25 @@ export default function RequestDetail() {
 
   const startEdit = async () => {
     setForm({ title: r.title, description: r.description, categoryId: r.categoryId })
+    setTouchedEdit({})
     setEditing(true)
   }
 
+  // Mesmas regras da criação (veja utils/requestValidation.js); o erro aparece depois que o campo é visitado
+  const editErrors = editing ? validateRequest(form) : {}
+  const editValid = Object.keys(editErrors).length === 0
+  const shownEditErrors = Object.fromEntries(Object.entries(editErrors).filter(([k]) => touchedEdit[k]))
+  const setField = (field, value) =>
+    setForm((prev) => ({ ...prev, [field]: field === 'title' ? cleanLine(value) : field === 'description' ? cleanText(value) : value }))
+
   const save = async (e) => {
     e.preventDefault()
+    if (!editValid) return setTouchedEdit({ title: true, categoryId: true, description: true })
+    const title = form.title.trim()
+    const description = form.description.trim()
     const patch = {}
-    if (form.title !== r.title) patch.title = form.title
-    if (form.description !== r.description) patch.description = form.description
+    if (title !== r.title) patch.title = title
+    if (description !== r.description) patch.description = description
     if (Number(form.categoryId) !== r.categoryId) patch.categoryId = form.categoryId
     if (!Object.keys(patch).length) return setEditing(false)
     return run(async () => {
@@ -151,26 +165,18 @@ export default function RequestDetail() {
           <section className="card">
             <h3>Descrição</h3>
             {editing ? (
-              <form className="edit-form" onSubmit={save}>
-                <label className="field">
-                  Assunto *
-                  <input required maxLength={255} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-                </label>
-                <label className="field">
-                  Categoria *
-                  <select required value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.nome}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  Descrição *
-                  <textarea required rows={6} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-                </label>
+              <form className="edit-form" onSubmit={save} noValidate>
+                <RequestFields
+                  idPrefix="edit"
+                  values={form}
+                  categories={categories}
+                  errors={shownEditErrors}
+                  onChange={setField}
+                  onBlur={(k) => setTouchedEdit((t) => ({ ...t, [k]: true }))}
+                />
                 <div className="row end">
                   <button type="button" className="btn ghost" onClick={() => setEditing(false)}>Cancelar</button>
-                  <button className="btn primary" disabled={busy}>{busy ? 'Salvando...' : 'Salvar'}</button>
+                  <button className="btn primary" disabled={busy || !editValid}>{busy ? 'Salvando...' : 'Salvar'}</button>
                 </div>
               </form>
             ) : (

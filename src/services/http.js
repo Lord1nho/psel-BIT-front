@@ -36,6 +36,14 @@ const parseMessage = (body, fallback) => {
   return m || fallback
 }
 
+// 413 e 5xx chegam com textos técnicos em inglês ("request entity too large", "Internal server error")
+const friendlyMessage = (status) =>
+  status === 413
+    ? 'O conteúdo enviado é grande demais. Reduza o texto e tente novamente.'
+    : status >= 500
+      ? 'Erro inesperado no servidor. Tente novamente em instantes.'
+      : null
+
 export async function request(path, { method = 'GET', body, query, auth = true } = {}) {
   const params = new URLSearchParams()
   Object.entries(query || {}).forEach(([k, v]) => {
@@ -66,7 +74,7 @@ export async function request(path, { method = 'GET', body, query, auth = true }
       session.clear()
       onUnauthorized()
     }
-    throw new ApiError(res.status, parseMessage(data, `Erro ${res.status}`))
+    throw new ApiError(res.status, friendlyMessage(res.status) || parseMessage(data, `Erro ${res.status}`))
   }
   return data
 }
