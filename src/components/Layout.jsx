@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, useOutlet, useNavigate, useLocation, useNavigationType } from 'react-router-dom'
+import { Link, NavLink, useOutlet, useNavigate, useLocation, useNavigationType } from 'react-router-dom'
 import { AnimatePresence, m } from 'motion/react'
-import { LayoutDashboard, Ticket, PlusCircle, Bell, LogOut, Menu, ArrowLeft } from 'lucide-react'
+import { LayoutDashboard, Ticket, PlusCircle, Bell, LogOut, Menu } from 'lucide-react'
 import { useApp } from '../context'
 import { ROLES } from '../data/mock'
 import { Avatar } from './Shared'
@@ -23,11 +23,10 @@ export default function Layout() {
   const [menu, setMenu] = useState(false)
   const [runLogout, loggingOut] = useAction()
   const nav = useNavigate()
-  const { key, pathname, state } = useLocation()
+  const { pathname, state } = useLocation()
   const navType = useNavigationType()
   const outlet = useOutlet()
   const profileRef = useRef(null)
-  const canGoBack = key !== 'default'
 
   // Direção da transição: voltar (POP) · clique no menu (cima/baixo, vinda no state do link) · demais (avançar)
   const dir = navType === 'POP' ? 'back' : state?.dir || 'forward'
@@ -67,7 +66,7 @@ export default function Layout() {
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
       <aside className={open ? 'sidebar open' : 'sidebar'} onClick={() => setOpen(false)}>
         <div className="brand">
-          <span className="logo">BIT</span>
+          <Link to="/solicitacoes" className="logo" aria-label="BIT — ir para a tela inicial" title="Ir para a tela inicial">BIT</Link>
           <span className="brand-text">
             Portal de
             <br />
@@ -102,9 +101,6 @@ export default function Layout() {
           <button className="icon-btn" onClick={() => setOpen((o) => !o)} aria-label={open ? 'Fechar menu' : 'Abrir menu'} title={open ? 'Fechar menu' : 'Abrir menu'}>
             <Menu size={20} />
           </button>
-          <m.button className="back-btn" onClick={() => nav(-1)} disabled={!canGoBack} aria-label="Voltar" title="Voltar" whileTap={{ x: -3 }}>
-            <ArrowLeft size={18} /> Voltar
-          </m.button>
           <div className="spacer" />
           {!isAgent && (
             <button className="btn primary sm hide-sm" onClick={() => nav('/nova')}>

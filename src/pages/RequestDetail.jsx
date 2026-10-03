@@ -7,17 +7,19 @@ import * as api from '../services/api'
 import { invalidateDashboard } from '../queryClient'
 import { useAction } from '../hooks/useAction'
 import { fmtId, fmtDate, StatusBadge, Avatar } from '../components/Shared'
+import Modal from '../components/Modal'
+import ErrorPage from '../components/ErrorPage'
 
 export default function RequestDetail() {
   const { id } = useParams()
-  const { user, isAgent, notify } = useApp()
+  const { user, isAgent, notify, showError } = useApp()
   const nav = useNavigate()
   const [r, setR] = useState(null)
   const [error, setError] = useState(null)
   const [categories, setCategories] = useState([])
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({})
-  const [formError, setFormError] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [run, busy] = useAction()
   const [newStatus, setNewStatus] = useState(null)
 
@@ -35,12 +37,12 @@ export default function RequestDetail() {
   }, [id])
 
   if (error)
-    return (
-      <div className="card empty">
-        <h3>{error.status === 404 ? 'Solicitação não encontrada' : error.status === 403 ? 'Sem acesso a esta solicitação' : 'Erro ao carregar'}</h3>
-        <p className="muted">{error.message}</p>
-        <Link to="/solicitacoes">Voltar à lista</Link>
-      </div>
+    return error.status === 404 ? (
+      <ErrorPage variant="notfound" title="Solicitação não encontrada" message={error.message} />
+    ) : error.status === 403 ? (
+      <ErrorPage variant="forbidden" title="Sem acesso a esta solicitação" message={error.message} />
+    ) : (
+      <ErrorPage variant="generic" title="Não foi possível carregar a solicitação" message={error.message} />
     )
   if (!r) return <p className="muted">Carregando...</p>
 
@@ -49,7 +51,6 @@ export default function RequestDetail() {
 
   const startEdit = async () => {
     setForm({ title: r.title, description: r.description, categoryId: r.categoryId })
-    setFormError('')
     setEditing(true)
     if (!categories.length) api.getCategories().then(setCategories).catch(() => {})
   }
@@ -62,7 +63,6 @@ export default function RequestDetail() {
     if (Number(form.categoryId) !== r.categoryId) patch.categoryId = form.categoryId
     if (!Object.keys(patch).length) return setEditing(false)
     return run(async () => {
-      setFormError('')
       try {
         const updated = await api.updateRequest(r.id, patch)
         invalidateDashboard()
@@ -70,13 +70,14 @@ export default function RequestDetail() {
         setEditing(false)
         notify('Solicitação atualizada')
       } catch (err) {
-        setFormError(err.message)
+        showError('Não foi possível salvar as alterações', err.message)
       }
     })
   }
 
+  // a exclusão pede confirmação em modal (vermelho); só chama a API depois de confirmar
   const remove = () => {
-    if (!window.confirm(`Excluir a solicitação ${fmtId(r.id)}? Esta ação não pode ser desfeita.`)) return
+    setConfirmDelete(false)
     return run(async () => {
       try {
         await api.deleteRequest(r.id)
@@ -84,7 +85,7 @@ export default function RequestDetail() {
         notify('Solicitação excluída')
         nav('/solicitacoes')
       } catch (err) {
-        notify(err.message)
+        showError('Não foi possível excluir a solicitação', err.message)
       }
     })
   }
@@ -108,7 +109,7 @@ export default function RequestDetail() {
         setNewStatus(null)
         notify(`Status alterado para ${label(selected)}`)
       } catch (err) {
-        notify(err.message)
+        showError('Não foi possível alterar o status', err.message)
         // outro atendente pode ter alterado antes: recarrega o estado atual
         api.getRequest(r.id).then((d) => { setR(d); setNewStatus(null) }).catch(() => {})
       }
@@ -131,7 +132,7 @@ export default function RequestDetail() {
               <button className="btn ghost sm" onClick={startEdit}>
                 <Pencil size={14} /> Editar
               </button>
-              <button className="btn danger sm" onClick={remove} disabled={busy}>
+              <button className="btn danger sm" onClick={() => setConfirmDelete(true)} disabled={busy}>
                 <Trash2 size={14} /> Excluir
               </button>
             </>
@@ -161,7 +162,6 @@ export default function RequestDetail() {
                   Descrição *
                   <textarea required rows={6} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                 </label>
-                {formError && <p className="error">{formError}</p>}
                 <div className="row end">
                   <button type="button" className="btn ghost" onClick={() => setEditing(false)}>Cancelar</button>
                   <button className="btn primary" disabled={busy}>{busy ? 'Salvando...' : 'Salvar'}</button>
@@ -244,6 +244,8 @@ export default function RequestDetail() {
           </div>
           <hr />
           <dl>
+            <dt>Setor</dt>
+            <dd>{r.category}</dd>
             <dt>Solicitante</dt>
             <dd className="row"><Avatar name={r.requester || '?'} size={24} /> {r.requester}</dd>
             <dt>Criada em</dt>
@@ -253,6 +255,17 @@ export default function RequestDetail() {
           </dl>
         </aside>
       </div>
+      <Modal
+        open={confirmDelete}
+        variant="danger"
+        title="Excluir esta solicitação?"
+        cancelLabel="Manter solicitação"
+        confirmLabel="Excluir"
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={remove}
+      >
+        A solicitação {fmtId(r.id)} e seu histórico serão removidos. Esta ação não pode ser desfeita.
+      </Modal>
     </>
   )
 }
