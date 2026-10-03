@@ -4,6 +4,7 @@ import { Search, PlusCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRi
 import { useApp } from '../context'
 import { STATUS, API_STATUSES } from '../data/mock'
 import * as api from '../services/api'
+import { useCategories } from '../hooks/useCategories'
 import { fmtId, fmtDate, StatusBadge } from '../components/Shared'
 
 const SIZES = [10, 20, 50]
@@ -13,6 +14,7 @@ const statusFromUrl = (s) => (API_STATUSES.includes(s) ? s : '')
 
 export default function Requests() {
   const { isAgent, user } = useApp()
+  const { categories } = useCategories()
   const [params, setParams] = useSearchParams()
   // filtros iniciais vindos da URL (ex.: clique num card do dashboard)
   const [q, setQ] = useState(params.get('q') || '')
@@ -24,17 +26,12 @@ export default function Requests() {
   const [to, setTo] = useState(params.get('dataFim') || '')
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(20)
-  const [categories, setCategories] = useState([])
   const [known, setKnown] = useState({}) // atendentes já vistos nos resultados: { id: nome }
   const [data, setData] = useState(null) // { items, total, page, size, totalPages }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const invalidRange = from && to && to < from
-
-  useEffect(() => {
-    api.getCategories().then(setCategories).catch(() => {})
-  }, [])
 
   // busca dinâmica: debounce de ~300 ms; campo vazio não envia `q`
   useEffect(() => {

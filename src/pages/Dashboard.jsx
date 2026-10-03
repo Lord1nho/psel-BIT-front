@@ -10,6 +10,7 @@ import {
 import { useApp } from '../context'
 import { STATUS } from '../data/mock'
 import * as api from '../services/api'
+import { useCategories } from '../hooks/useCategories'
 import { Stagger, Group, Reveal } from '../motion/Reveal'
 import { item } from '../motion/variants'
 
@@ -59,20 +60,16 @@ function Kpi({ to, color, icon: Icon, label, description, value, total }) {
 
 export default function Dashboard() {
   const { isAgent, user } = useApp()
+  const { categories } = useCategories()
   // `periodo` e `dataInicio/dataFim` são exclusivos: escolher um limpa o outro
   const [periodo, setPeriodo] = useState('tudo')
   const [dataInicio, setDataInicio] = useState('')
   const [dataFim, setDataFim] = useState('')
   const [categoriaId, setCategoriaId] = useState('')
   const [escopo, setEscopo] = useState('geral')
-  const [categories, setCategories] = useState([])
   const [hidden, setHidden] = useState({})
 
   const invalidRange = dataInicio && dataFim && dataFim < dataInicio
-
-  useEffect(() => {
-    api.getCategories().then(setCategories).catch(() => {})
-  }, [])
 
   const filters = {
     periodo: periodo || undefined,

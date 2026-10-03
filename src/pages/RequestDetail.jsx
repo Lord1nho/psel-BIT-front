@@ -4,6 +4,7 @@ import { ArrowLeft, MessageSquare, Circle, Clock, Pencil, Trash2, Ban } from 'lu
 import { useApp } from '../context'
 import { STATUS, PRIORITY } from '../data/mock'
 import * as api from '../services/api'
+import { useCategories } from '../hooks/useCategories'
 import { invalidateDashboard } from '../queryClient'
 import { useAction } from '../hooks/useAction'
 import { fmtId, fmtDate, StatusBadge, Avatar } from '../components/Shared'
@@ -16,8 +17,8 @@ export default function RequestDetail() {
   const nav = useNavigate()
   const [r, setR] = useState(null)
   const [error, setError] = useState(null)
-  const [categories, setCategories] = useState([])
   const [editing, setEditing] = useState(false)
+  const { categories } = useCategories({ enabled: editing }) // só busca ao editar; depois vem do cache
   const [form, setForm] = useState({})
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [run, busy] = useAction()
@@ -52,7 +53,6 @@ export default function RequestDetail() {
   const startEdit = async () => {
     setForm({ title: r.title, description: r.description, categoryId: r.categoryId })
     setEditing(true)
-    if (!categories.length) api.getCategories().then(setCategories).catch(() => {})
   }
 
   const save = async (e) => {
