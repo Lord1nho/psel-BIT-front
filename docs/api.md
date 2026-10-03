@@ -333,3 +333,70 @@ Exemplos: `GET /dashboard?periodo=7d` · `GET /dashboard?periodo=30d&categoriaId
 - Clique numa barra de setor pode aplicar `categoriaId`; os botões **Tudo / 30 dias / 7 dias** enviam `periodo`; o seletor de datas envia `dataInicio`/`dataFim` (e deixa de enviar `periodo`).
 
 Erros: **400** para `periodo`/`agrupamento`/`escopo` fora dos valores, `periodo` junto de datas, data inexistente, `dataInicio` maior que `dataFim`, `categoriaId` não numérico, `fuso` inválido, parâmetro desconhecido, série com mais de 400 pontos ou `escopo` enviado por solicitante; **401** sem token.
+
+
+---
+
+## 11. Comentários (comunicação no chamado)
+
+Conversa entre o solicitante dono e o atendente responsável, dentro do chamado. Rotas aninhadas: `/solicitacoes/:codigo/comentarios`.
+
+### Quem pode o quê
+
+| Situação | Ler | Comentar |
+|---|---|---|
+| Solicitante dono | sim | sim (exceto chamado CONCLUIDO) |
+| Outro solicitante | 403 | 403 |
+| Atendente, chamado ABERTO | sim | sim, e **comentar assume o chamado** (vira EM_ATENDIMENTO e o atendente é o responsável; o primeiro a chegar vence, o outro recebe 409) |
+| Atendente responsável, EM_ATENDIMENTO | sim | sim |
+| Outro atendente, EM_ATENDIMENTO | sim | 403 com o nome do responsável |
+| Qualquer um, CONCLUIDO | sim | 409 (somente leitura: criar, editar e excluir) |
+
+Apagar o comentário que assumiu o chamado **não** devolve o chamado para ABERTO (o histórico não muda). Ao excluir um chamado (só em ABERTO), os comentários vão junto.
+
+### GET /solicitacoes/:codigo/comentarios
+
+Do mais antigo para o mais novo. Query (opcionais): `proxComentario` (cursor) e `limite` (1 a 100, padrão 50).
+
+```json
+{
+  "itens": [
+    { "id": 41, "texto": "Qual o patrimônio?", "dataCriacao": "2026-10-01T14:00:00.000Z", "dataEdicao": null,
+      "autor": { "id": 1, "nome": "Atendente Um", "perfil": "ATENDENTE" } },
+    { "id": 42, "texto": "É o 1234", "dataCriacao": "2026-10-01T14:05:00.000Z", "dataEdicao": "2026-10-01T14:06:00.000Z",
+      "autor": { "id": 2, "nome": "Solicitante Um", "perfil": "SOLICITANTE" } }
+  ],
+  "total": 2,
+  "proxComentario": 42
+}
+```
+
+- `total`: todos os comentários do chamado (independe do cursor).
+- `dataEdicao`: `null` se nunca foi editado (mostre "editado" quando vier preenchido).
+- `proxComentario` é o cursor da conversa: o id do último comentário devolvido (ou o que você enviou, se não houve novidade; `null` se não há comentários). Reenvie-o na próxima chamada (`?proxComentario=42`) para receber só os comentários posteriores.
+
+Como o front usa:
+- Ao abrir o chamado, chame sem parâmetros e exiba todos os comentários desde o primeiro. Se `itens` vier com `limite` itens, peça a continuação com o `proxComentario` recebido até vir menos que o limite.
+- Com a conversa aberta, repita `?proxComentario=<último>` a cada 10 a 30 s e acrescente o que vier ao fim da lista. Sem novidade, `itens` é `[]` (a resposta traz `ETag` e `Cache-Control: private, no-cache`, então o navegador recebe 304 sem corpo).
+- O cursor só traz comentários **novos**: edições e exclusões de comentários antigos aparecem ao recarregar a conversa inteira (chame de novo sem `proxComentario`), e as suas próprias ações você já aplica na tela.
+- Depois de enviar um comentário como atendente num chamado ABERTO, recarregue o detalhe: o status passou a EM_ATENDIMENTO.
+
+### POST /solicitacoes/:codigo/comentarios
+
+```json
+{ "texto": "Pode me passar o número do patrimônio?" }
+```
+
+**201**: o comentário criado, no mesmo formato de um item de `itens`. Erros: 400 (texto vazio, só espaços, acima de 2.000 caracteres, com caractere nulo ou campo extra), 403, 404, 409 (chamado concluído, ou outro atendente assumiu o chamado antes).
+
+### PATCH /solicitacoes/:codigo/comentarios/:comentarioId
+
+```json
+{ "texto": "Texto corrigido" }
+```
+
+**200**: o comentário atualizado, com `dataEdicao` preenchida. Só o autor edita (403 para os demais). Erros: 400, 403, 404 (comentário inexistente ou de outro chamado), 409 (chamado concluído).
+
+### DELETE /solicitacoes/:codigo/comentarios/:comentarioId
+
+**204** sem corpo. Só o autor exclui (a exclusão é definitiva). Erros: 403, 404, 409 (chamado concluído).

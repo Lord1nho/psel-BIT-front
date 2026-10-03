@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useOutlet, useNavigate, useLocation, useNavigationType } from 'react-router-dom'
 import { AnimatePresence, m } from 'motion/react'
-import { LayoutDashboard, Ticket, PlusCircle, Bell, LogOut, Menu } from 'lucide-react'
+import { LayoutDashboard, Ticket, PlusCircle, Bell, LogOut, Menu, ChevronRight } from 'lucide-react'
 import { useApp } from '../context'
 import { ROLES } from '../data/mock'
-import { Avatar } from './Shared'
+import { Avatar, fmtId } from './Shared'
 import { useAction } from '../hooks/useAction'
 import { pageVariants } from '../motion/variants'
 
@@ -16,6 +16,20 @@ const NAV = [
   { to: '/solicitacoes', icon: Ticket, label: 'Solicitações' },
   { to: '/nova', icon: PlusCircle, label: 'Nova solicitação', requesterOnly: true },
 ]
+
+// Trilha de telas (Dashboard > Solicitações > Chamado #0493), montada a partir da URL
+function trail(pathname) {
+  const crumbs = [{ to: '/', label: 'Dashboard' }]
+  if (pathname === '/') return crumbs
+  if (pathname.startsWith('/nova')) return [...crumbs, { label: 'Nova solicitação' }]
+  if (pathname.startsWith('/solicitacoes')) {
+    const id = pathname.split('/')[2]
+    return id
+      ? [...crumbs, { to: '/solicitacoes', label: 'Solicitações' }, { label: `Chamado ${/^\d+$/.test(id) ? fmtId(id) : ''}`.trim() }]
+      : [...crumbs, { label: 'Solicitações' }]
+  }
+  return crumbs
+}
 
 export default function Layout() {
   const { logout, user, isAgent } = useApp()
@@ -101,6 +115,20 @@ export default function Layout() {
           <button className="icon-btn" onClick={() => setOpen((o) => !o)} aria-label={open ? 'Fechar menu' : 'Abrir menu'} title={open ? 'Fechar menu' : 'Abrir menu'}>
             <Menu size={20} />
           </button>
+          <nav className="breadcrumb" aria-label="Você está em">
+            <ol>
+              {trail(pathname).map((c, i, all) => (
+                <li key={i} className={i === all.length - 1 ? 'current' : undefined}>
+                  {i > 0 && <ChevronRight size={14} aria-hidden="true" />}
+                  {c.to && i < all.length - 1 ? (
+                    <Link to={c.to} state={menuDirection(c.to) ?? { dir: 'up' }}>{c.label}</Link>
+                  ) : (
+                    <span aria-current={i === all.length - 1 ? 'page' : undefined}>{c.label}</span>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </nav>
           <div className="spacer" />
           {!isAgent && (
             <button className="btn primary sm hide-sm" onClick={() => nav('/nova')}>
