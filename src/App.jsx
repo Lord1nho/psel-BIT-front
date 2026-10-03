@@ -1,4 +1,4 @@
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, XCircle } from 'lucide-react'
 import { AnimatePresence, m } from 'motion/react'
 import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom'
 import { AppProvider, useApp } from './context'
@@ -8,24 +8,30 @@ import Dashboard from './pages/Dashboard'
 import Requests from './pages/Requests'
 import NewRequest from './pages/NewRequest'
 import RequestDetail from './pages/RequestDetail'
+import Modal from './components/Modal'
+import ErrorPage from './components/ErrorPage'
 
 // Raiz: aviso (toast) global, visível também na tela de login
 function Shell() {
-  const { toast } = useApp()
+  const { toast, failure, clearError } = useApp()
   return (
     <>
       <Outlet />
+      {/* falhas de ação (criar, editar, excluir, status) aparecem neste modal de erro */}
+      <Modal open={!!failure} variant="error" title={failure?.title} onConfirm={clearError} onCancel={clearError}>
+        {failure?.message}
+      </Modal>
       <AnimatePresence>
         {toast && (
           <m.div
             key="toast"
-            className="toast"
+            className={`toast ${toast.type}`}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
             transition={{ duration: 0.2 }}
           >
-            <CheckCircle2 size={18} /> {toast}
+            {toast.type === 'error' ? <XCircle size={18} /> : <CheckCircle2 size={18} />} {toast.msg}
           </m.div>
         )}
       </AnimatePresence>
@@ -35,8 +41,11 @@ function Shell() {
 
 // Apenas usuários autenticados acessam o sistema; sem login, qualquer rota mostra o login
 function Protected() {
-  const { user } = useApp()
-  return user ? <Outlet /> : <Login />
+  const { user, authError, dismissAuthError } = useApp()
+  if (user) return <Outlet />
+  // sessão expirada (401): tela de erro pedindo novo login; depois do login o destino é sempre a listagem
+  if (authError) return <ErrorPage variant="unauthorized" fullscreen onAction={dismissAuthError} actionLabel="Fazer login" />
+  return <Login />
 }
 
 // O atendente não abre solicitações
@@ -49,6 +58,7 @@ function RequesterOnly({ children }) {
 const router = createBrowserRouter([
   {
     element: <Shell />,
+    errorElement: <ErrorPage variant="generic" fullscreen />,
     children: [
       {
         element: <Protected />,
@@ -60,11 +70,11 @@ const router = createBrowserRouter([
               { path: 'solicitacoes', element: <Requests /> },
               { path: 'solicitacoes/:id', element: <RequestDetail /> },
               { path: 'nova', element: <RequesterOnly><NewRequest /></RequesterOnly> },
+              { path: '*', element: <ErrorPage variant="notfound" /> },
             ],
           },
         ],
       },
-      { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
 ])

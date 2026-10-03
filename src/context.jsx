@@ -9,23 +9,31 @@ export const useApp = () => useContext(Ctx)
 
 export function AppProvider({ children }) {
   const [user, setUser] = useState(() => session.get()?.user || null)
-  const [toast, setToast] = useState(null)
+  const [toast, setToast] = useState(null) // { msg, type }
+  const [failure, setFailure] = useState(null) // { title, message } -> modal de erro global
+  const [authError, setAuthError] = useState(false) // sessão expirada/não autenticado -> tela de erro 401
 
-  const notify = useCallback((msg) => {
-    setToast(msg)
+  // Toast de sucesso (verde) por padrão; falhas de ação usam showError (modal)
+  const notify = useCallback((msg, type = 'success') => {
+    setToast({ msg, type })
     setTimeout(() => setToast(null), 3000)
   }, [])
+  const showError = useCallback((title, message) => setFailure({ title, message }), [])
+  const clearError = useCallback(() => setFailure(null), [])
 
   // 401 fora do login: token ausente/expirado -> volta para a tela de login
   useEffect(() => {
     setUnauthorizedHandler(() => {
       queryClient.clear()
       setUser(null)
-      notify('Sessão expirada. Entre novamente.')
+      setAuthError(true)
     })
-  }, [notify])
+  }, [])
 
-  const login = async (credentials) => setUser(await api.login(credentials))
+  const login = async (credentials) => {
+    setUser(await api.login(credentials))
+    setAuthError(false)
+  }
   const logout = async () => {
     await api.logout()
     queryClient.clear()
@@ -34,5 +42,11 @@ export function AppProvider({ children }) {
 
   const isAgent = user?.role === 'ATENDENTE'
 
-  return <Ctx.Provider value={{ user, isAgent, toast, notify, login, logout }}>{children}</Ctx.Provider>
+  return (
+    <Ctx.Provider
+      value={{ user, isAgent, toast, notify, failure, showError, clearError, authError, dismissAuthError: () => setAuthError(false), login, logout }}
+    >
+      {children}
+    </Ctx.Provider>
+  )
 }

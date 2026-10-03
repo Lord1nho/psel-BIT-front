@@ -64,12 +64,32 @@ export async function logout() {
 /** GET /categorias */
 export const getCategories = () => request('/categorias')
 
-/** GET /solicitacoes — filtros: status, categoryId, q, from, to (AAAA-MM-DD) */
-export async function listRequests({ status, categoryId, q, from, to } = {}) {
+/**
+ * GET /solicitacoes — filtros e paginação no servidor.
+ * `statuses`: um ou vários separados por vírgula (ex.: 'ABERTO,EM_ATENDIMENTO'); omitido = todos.
+ * `from`/`to`: AAAA-MM-DD. `page` (>= 1) e `size` (1 a 100).
+ * Retorna { items, total, page, size, totalPages }.
+ */
+export async function listRequests({ statuses, categoryId, assigneeId, q, from, to, page = 1, size = 20 } = {}) {
   const data = await request('/solicitacoes', {
-    query: { status, categoriaId: categoryId, q: q?.trim(), dataInicio: from, dataFim: to },
+    query: {
+      status: statuses,
+      categoriaId: categoryId,
+      atendenteId: assigneeId,
+      q: q?.trim(),
+      dataInicio: from,
+      dataFim: to,
+      pagina: page,
+      tamanho: size,
+    },
   })
-  return data.map(toListItem)
+  return {
+    items: data.itens.map(toListItem),
+    total: data.total,
+    page: data.pagina,
+    size: data.tamanho,
+    totalPages: data.totalPaginas,
+  }
 }
 
 /** GET /solicitacoes/:codigo */

@@ -1,28 +1,32 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Search, PlusCircle, ChevronLeft, ChevronRight, Inbox } from 'lucide-react'
+import { Search, PlusCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Inbox } from 'lucide-react'
 import { useApp } from '../context'
 import { STATUS, API_STATUSES } from '../data/mock'
 import * as api from '../services/api'
 import { fmtId, fmtDate, StatusBadge } from '../components/Shared'
 
-const PER_PAGE = 8
+const SIZES = [10, 20, 50]
+
+// '' = todos os status (padrão) · ou um único status
+const statusFromUrl = (s) => (API_STATUSES.includes(s) ? s : '')
 
 export default function Requests() {
   const { isAgent, user } = useApp()
   const [params, setParams] = useSearchParams()
-  const initialStatus = params.get('status')
+  // filtros iniciais vindos da URL (ex.: clique num card do dashboard)
   const [q, setQ] = useState(params.get('q') || '')
   const [debouncedQ, setDebouncedQ] = useState(q)
-  const [status, setStatus] = useState(API_STATUSES.includes(initialStatus) ? initialStatus : '')
-  // filtros iniciais vindos da URL (ex.: clique num card do dashboard)
+  const [status, setStatus] = useState(statusFromUrl(params.get('status')))
   const [categoryId, setCategoryId] = useState(params.get('categoriaId') || '')
-  const [assigneeId, setAssigneeId] = useState(params.get('atendente') || '') // '' = todos · 'none' = sem atendente · id
+  const [assigneeId, setAssigneeId] = useState(/^\d+$/.test(params.get('atendente') || '') ? params.get('atendente') : '')
   const [from, setFrom] = useState(params.get('dataInicio') || '')
   const [to, setTo] = useState(params.get('dataFim') || '')
   const [page, setPage] = useState(1)
+  const [size, setSize] = useState(20)
   const [categories, setCategories] = useState([])
-  const [list, setList] = useState([])
+  const [known, setKnown] = useState({}) // atendentes já vistos nos resultados: { id: nome }
+  const [data, setData] = useState(null) // { items, total, page, size, totalPages }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -38,37 +42,42 @@ export default function Requests() {
     return () => clearTimeout(t)
   }, [q])
 
+  // Filtros e paginação rodam no servidor; cada mudança refaz a consulta
   useEffect(() => {
     if (invalidRange) return
     let cancelled = false
     setLoading(true)
     api
-      .listRequests({ status, categoryId, q: debouncedQ, from, to })
+      .listRequests({ statuses: status || undefined, categoryId, assigneeId, q: debouncedQ, from, to, page, size })
       .then((r) => {
         if (cancelled) return
-        setList(r)
+        // página além do fim (ex.: depois de mudar um filtro): volta para a última existente
+        if (r.items.length === 0 && r.totalPages > 0 && page > r.totalPages) return setPage(r.totalPages)
+        setData(r)
         setError('')
+        setKnown((k) => {
+          const next = { ...k }
+          r.items.forEach((i) => i.assigneeId !== null && (next[i.assigneeId] = i.assignee))
+          return next
+        })
       })
       .catch((e) => !cancelled && setError(e.message))
       .finally(() => !cancelled && setLoading(false))
     return () => {
       cancelled = true
     }
-  }, [status, categoryId, debouncedQ, from, to, invalidRange])
+  }, [status, categoryId, assigneeId, debouncedQ, from, to, page, size, invalidRange])
 
-  // A API ainda não filtra por atendente: o filtro é aplicado aqui, sobre o resultado já filtrado pelo servidor.
-  // Trocar por um parâmetro de query quando o contrato oferecer.
-  const visible = list.filter((r) =>
-    !assigneeId ? true : assigneeId === 'none' ? r.assigneeId === null : String(r.assigneeId) === assigneeId,
-  )
-  // "Meus" = o próprio atendente logado, sempre primeiro e com o nome dele; depois os demais
-  const others = new Map(list.filter((r) => r.assigneeId !== null && r.assigneeId !== user.id).map((r) => [String(r.assigneeId), r.assignee]))
-  const assignees = [...(isAgent ? [[String(user.id), user.name]] : []), ...others]
-  if (assigneeId && assigneeId !== 'none' && !assignees.some(([id]) => id === assigneeId)) assignees.push([assigneeId, 'Atendente selecionado'])
+  // "Meus" = o próprio atendente logado, sempre primeiro e com o nome dele; depois os demais já vistos
+  const assignees = Object.entries(known).filter(([id]) => Number(id) !== user.id)
+  if (isAgent) assignees.unshift([String(user.id), user.name])
+  if (assigneeId && !assignees.some(([id]) => id === assigneeId)) assignees.push([assigneeId, 'Atendente selecionado'])
 
-  const pages = Math.max(1, Math.ceil(visible.length / PER_PAGE))
-  const cur = Math.min(page, pages)
-  const rows = visible.slice((cur - 1) * PER_PAGE, cur * PER_PAGE)
+  const rows = data?.items ?? []
+  const total = data?.total ?? 0
+  const totalPages = Math.max(data?.totalPages ?? 1, 1)
+  const first = total ? (page - 1) * size + 1 : 0
+  const last = first ? first + rows.length - 1 : 0
 
   const change = (setter) => (e) => {
     setter(e.target.value)
@@ -119,7 +128,6 @@ export default function Requests() {
           </select>
           <select value={assigneeId} onChange={change(setAssigneeId)}>
             <option value="">{isAgent ? 'Todos (Geral)' : 'Todos os atendentes'}</option>
-            <option value="none">Sem atendente</option>
             {assignees.map(([id, name]) => (
               <option key={id} value={id}>{name}</option>
             ))}
@@ -135,7 +143,7 @@ export default function Requests() {
         {invalidRange && <p className="error pad">A data final não pode ser anterior à inicial.</p>}
         {error && <p className="error pad">{error}</p>}
 
-        {loading ? (
+        {!data && loading ? (
           <div className="empty muted">Carregando...</div>
         ) : rows.length === 0 ? (
           <div className="empty">
@@ -144,7 +152,7 @@ export default function Requests() {
             <p className="muted">Ajuste os filtros{isAgent ? '.' : ' ou crie uma nova solicitação.'}</p>
           </div>
         ) : (
-          <div className="table-wrap">
+          <div className={loading ? 'table-wrap loading' : 'table-wrap'}>
             <table>
               <thead>
                 <tr>
@@ -177,11 +185,19 @@ export default function Requests() {
         )}
 
         <div className="pager">
-          <span className="muted">{visible.length} resultado(s)</span>
+          <span className="muted">{total ? `Mostrando ${first}–${last} de ${total}` : '0 resultados'}</span>
           <div className="row">
-            <button className="icon-btn" disabled={cur === 1} onClick={() => setPage(cur - 1)}><ChevronLeft size={18} /></button>
-            <span>{cur} / {pages}</span>
-            <button className="icon-btn" disabled={cur === pages} onClick={() => setPage(cur + 1)}><ChevronRight size={18} /></button>
+            <label className="size-field muted">
+              Por página
+              <select value={size} onChange={(e) => { setSize(Number(e.target.value)); setPage(1) }}>
+                {SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+            <button className="icon-btn" aria-label="Primeira página" disabled={page <= 1 || loading} onClick={() => setPage(1)}><ChevronsLeft size={18} /></button>
+            <button className="icon-btn" aria-label="Página anterior" disabled={page <= 1 || loading} onClick={() => setPage(page - 1)}><ChevronLeft size={18} /></button>
+            <span>{page} / {totalPages}</span>
+            <button className="icon-btn" aria-label="Próxima página" disabled={page >= totalPages || loading} onClick={() => setPage(page + 1)}><ChevronRight size={18} /></button>
+            <button className="icon-btn" aria-label="Última página" disabled={page >= totalPages || loading} onClick={() => setPage(totalPages)}><ChevronsRight size={18} /></button>
           </div>
         </div>
       </div>

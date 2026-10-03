@@ -39,6 +39,7 @@ Contrato da API por funcionalidade. Os casos de uso estão em [`use-cases.md`](u
 | Consultar detalhe | só as próprias | qualquer uma |
 | Editar / excluir | só as próprias em `ABERTO` | não (403) |
 | Alterar status | não (403) | sim |
+| Dashboard | sim (só as próprias) | sim (geral, ou só as que assumiu) |
 
 Mostre editar e excluir só quando `status === 'ABERTO'` e a solicitação for do usuário; o servidor valida de qualquer forma.
 
@@ -47,7 +48,9 @@ Mostre editar e excluir só quando `status === 'ABERTO'` e a solicitação for d
 | usuario | senha | perfil |
 |---|---|---|
 | `solicitante.um` | `123456` | SOLICITANTE |
+| `solicitante.dois` | `123456` | SOLICITANTE |
 | `atendente.um` | `123456` | ATENDENTE |
+| `atendente.dois` | `123456` | ATENDENTE |
 
 ## 2. Login e sessão
 
@@ -117,29 +120,69 @@ Todos os parâmetros de query são opcionais e combináveis:
 
 | Query | Formato | Observação |
 |---|---|---|
-| `status` | enum | |
+| `status` | um ou vários: `ABERTO`, `EM_ATENDIMENTO`, `CONCLUIDO` | Vários: separados por vírgula (`status=ABERTO,EM_ATENDIMENTO`) ou o parâmetro repetido (`status=ABERTO&status=EM_ATENDIMENTO`). Ausente ou vazio = todos. Repetidos são ignorados. |
 | `categoriaId` | inteiro | |
+| `atendenteId` | inteiro | **Novo.** Só os chamados que esse atendente assumiu (o mesmo `atendente` que aparece na linha). Chamados nunca assumidos não entram. Roda no servidor, então vale para todas as páginas. |
 | `q` | texto, até 100 caracteres | Busca em parte do título, no nome ou usuário do solicitante e, se for só número, no código. Não diferencia maiúsculas. |
 | `dataInicio` | `AAAA-MM-DD` | |
 | `dataFim` | `AAAA-MM-DD` | Inclusiva. Não pode ser anterior a `dataInicio`. |
+| `pagina` | inteiro ≥ 1 (até 1.000.000) | Padrão 1. |
+| `tamanho` | inteiro de 1 a 100 | Itens por página. Padrão 20. |
 
-Exemplo: `GET /solicitacoes?q=note&status=ABERTO&dataInicio=2026-09-01&dataFim=2026-09-30`
+Exemplos:
+- `GET /solicitacoes?status=ABERTO,EM_ATENDIMENTO&pagina=1&tamanho=20` (tela inicial: abertos e em atendimento)
+- `GET /solicitacoes?q=note&status=ABERTO&dataInicio=2026-09-01&dataFim=2026-09-30&pagina=2`
+- `GET /solicitacoes?atendenteId=1&status=EM_ATENDIMENTO` (chamados em atendimento do atendente 1)
 
-**200**: array (sem paginação), da mais recente para a mais antiga:
+**200**: um envelope com a página pedida e os totais:
 ```json
-[
-  {
-    "codigo": 3, "titulo": "Notebook lento", "status": "ABERTO",
-    "dataCriacao": "2026-09-30T14:22:10.123Z",
-    "categoria": { "id": 1, "nome": "TI" },
-    "solicitante": { "id": 2, "nome": "Solicitante Um" }
-  }
-]
+{
+  "itens": [
+    {
+      "codigo": 3, "titulo": "Notebook lento", "status": "ABERTO",
+      "dataCriacao": "2026-09-30T14:22:10.123Z",
+      "categoria": { "id": 1, "nome": "TI" },
+      "solicitante": { "id": 2, "nome": "Solicitante Um" },
+      "atendente": { "id": 1, "nome": "Atendente Um" },
+      "ultimaAtualizacao": "2026-09-30T16:40:00.000Z",
+      "dataConclusao": "2026-09-30T16:40:00.000Z"
+    }
+  ],
+  "total": 153,
+  "pagina": 1,
+  "tamanho": 20,
+  "totalPaginas": 8
+}
 ```
+
+| Campo | Significado |
+|---|---|
+| `itens` | Os chamados da página, da mais recente para a mais antiga (o código desempata datas iguais, então a ordem entre páginas é estável). Cada item tem os mesmos campos de antes. |
+| `total` | Quantidade de chamados que atendem aos filtros (e ao escopo do perfil), somando todas as páginas. |
+| `pagina`, `tamanho` | Os valores efetivamente usados (os padrões, se não enviados). |
+| `totalPaginas` | `ceil(total / tamanho)`. É **0** quando não há resultados. |
+
+Uma página além do fim responde **200** com `itens: []` (e o `total` correto). A última página pode trazer menos itens que `tamanho`.
+
+> **Mudança de contrato:** antes a resposta era um array simples. Agora o array está em `itens`. Mudar de página, filtro ou busca é só pedir de novo com outros parâmetros, e volte a `pagina=1` quando um filtro mudar.
+
+Colunas derivadas do histórico (não existem no detalhe como campos; lá use o array `historico`):
+
+| Campo | Significado |
+|---|---|
+| `atendente` | Quem moveu o chamado para `EM_ATENDIMENTO` (`{ id, nome }`); `null` se ainda não foi assumido. Se outro atendente concluir depois, continua sendo quem assumiu. |
+| `ultimaAtualizacao` | Horário da última **mudança de status**; igual a `dataCriacao` se nunca mudou. Editar título, descrição ou categoria **não** altera este campo. |
+| `dataConclusao` | Horário em que virou `CONCLUIDO`; `null` enquanto não concluído. |
+
+**Filtro por atendente:** envie `atendenteId` com o `id` do atendente (o `usuario.id` devolvido no login serve para "só os meus"). Não filtre por atendente no front sobre a lista: com a paginação ele só enxergaria a página atual. O mesmo vale para qualquer outro filtro: use os parâmetros acima, que contam no `total`.
+
+**Filtro padrão da tela:** o backend **não** filtra nada por padrão. Para abrir a tela mostrando só "Aberto + Em atendimento", o front envia `status=ABERTO,EM_ATENDIMENTO`; para "Todos", não envia `status`.
 
 **Busca dinâmica:** chame esta mesma rota a cada digitação, com *debounce* de ~300 ms. Se o campo ficar vazio, **não envie `q=`** (volta à lista completa). O escopo do solicitante vale também na busca.
 
-Erros: **400** para `status` fora do enum, `categoriaId` não numérico, data fora do formato, período invertido ou parâmetro desconhecido.
+**Cache HTTP:** a resposta traz `Cache-Control: private, no-cache` e `ETag`. O navegador revalida a cada chamada e, se nada mudou naquela página e naquele conjunto de filtros, recebe **304** sem corpo. O dado nunca fica desatualizado, e o conteúdo é por usuário (`private`).
+
+Erros: **400** para `status` fora do enum, `categoriaId` ou `atendenteId` inválidos (não inteiro ou menor que 1), data fora do formato, período invertido, `pagina` menor que 1 ou não inteira, `tamanho` menor que 1, maior que 100 ou não inteiro, ou parâmetro desconhecido.
 
 ## 6. Detalhe e histórico
 
@@ -203,9 +246,9 @@ Erros: **400** (status fora do enum); **403** (perfil SOLICITANTE); **404**; **4
 
 ### `GET /dashboard` (SOLICITANTE e ATENDENTE)
 
-Uma única rota alimenta os painéis numéricos e os gráficos. Tudo na resposta obedece ao período escolhido, e o escopo vem do token: o solicitante vê só as próprias solicitações; o atendente vê todas (ou só as que assumiu).
+Uma única rota alimenta painéis numéricos e gráficos (feita para Recharts). **Tudo na resposta obedece ao período escolhido**, e o escopo vem do token: o solicitante vê só as próprias solicitações; o atendente vê todas (ou só as que assumiu).
 
-Query (todos opcionais, combináveis):
+**Query (todos opcionais, combináveis):**
 
 | Parâmetro | Valores | Observação |
 |---|---|---|
@@ -213,8 +256,10 @@ Query (todos opcionais, combináveis):
 | `dataInicio`, `dataFim` | `AAAA-MM-DD` | Período personalizado, ambos inclusivos. **Não combine com `periodo`** (400). Com só um deles, o outro assume (início = primeira solicitação; fim = hoje). |
 | `categoriaId` | inteiro | Filtra por setor. |
 | `agrupamento` | `auto` (padrão), `dia`, `semana`, `mes` | `auto`: até 62 dias por dia; até 364 por semana; acima disso por mês. Máximo de 400 pontos na série (400 se passar). |
-| `escopo` | `geral` (padrão), `meus` | Só atendente (solicitante recebe 400). `meus` = chamados que ele assumiu. |
+| `escopo` | `geral` (padrão), `meus` | **Só atendente** (solicitante recebe 400). `meus` = chamados que ele assumiu. |
 | `fuso` | nome IANA, padrão `America/Sao_Paulo` | Define onde começa e termina cada dia. |
+
+Exemplos: `GET /dashboard?periodo=7d` · `GET /dashboard?periodo=30d&categoriaId=1` · `GET /dashboard?dataInicio=2026-09-01&dataFim=2026-09-30&agrupamento=semana` · `GET /dashboard?escopo=meus` (atendente).
 
 **200**
 ```json
@@ -222,17 +267,36 @@ Query (todos opcionais, combináveis):
   "periodo": { "tipo": "30d", "dataInicio": "2026-09-01", "dataFim": "2026-09-30", "agrupamento": "dia", "fuso": "America/Sao_Paulo" },
   "escopo": "geral",
   "totais": { "total": 120, "abertas": 40, "emAtendimento": 30, "concluidas": 50 },
-  "porStatus": [ { "status": "ABERTO", "total": 40 }, { "status": "EM_ATENDIMENTO", "total": 30 }, { "status": "CONCLUIDO", "total": 50 } ],
-  "porCategoria": [ { "categoriaId": 1, "nome": "TI", "total": 60, "abertas": 20, "emAtendimento": 15, "concluidas": 25 } ],
-  "serie": [ { "data": "2026-09-01", "criadas": 4, "concluidas": 2 } ]
+  "porStatus": [
+    { "status": "ABERTO", "total": 40 },
+    { "status": "EM_ATENDIMENTO", "total": 30 },
+    { "status": "CONCLUIDO", "total": 50 }
+  ],
+  "porCategoria": [
+    { "categoriaId": 1, "nome": "TI", "total": 60, "abertas": 20, "emAtendimento": 15, "concluidas": 25 }
+  ],
+  "serie": [
+    { "data": "2026-09-01", "criadas": 4, "concluidas": 2 }
+  ]
 }
 ```
 
-- `periodo`: intervalo realmente usado (subtítulo dos gráficos e preenchimento do filtro de datas no "Tudo"). `tipo` é `tudo`, `30d`, `7d` ou `personalizado`.
-- `escopo`: `proprias` (solicitante), `geral` ou `meus` (atendente).
-- `totais`: os 4 painéis numéricos. `porStatus`: sempre os 3 status (zero incluído). `porCategoria`: todas as categorias ativas, mesmo com zero (com `categoriaId` vem só a escolhida). `serie`: linha do tempo sem lacunas; em `semana`, `data` é a segunda-feira; em `mes`, o dia 1.
-- Uma solicitação pertence ao período pela data de criação, e todos os blocos usam a mesma coleção: `sum(serie.criadas) = totais.total` e `sum(porCategoria.total) = totais.total`.
-- Em `escopo=meus`, `abertas` é sempre 0 (chamado aberto ainda não tem atendente).
-- Resposta com `Cache-Control: private, no-cache` e `ETag`: o navegador revalida a cada chamada e recebe 304 se nada mudou.
+| Campo | Para que usar |
+|---|---|
+| `periodo` | Intervalo **realmente usado** (útil para o subtítulo dos gráficos e para preencher o filtro de datas no "Tudo"). `tipo` é `tudo`, `30d`, `7d` ou `personalizado`. |
+| `escopo` | `proprias` (solicitante), `geral` ou `meus` (atendente). |
+| `totais` | Os 4 painéis numéricos. |
+| `porStatus` | Sempre os 3 status (zero incluído): `<PieChart>` direto. |
+| `porCategoria` | Uma linha por setor, com as contagens por status: `<BarChart>` empilhado (`abertas`, `emAtendimento`, `concluidas`). Traz todas as categorias ativas, mesmo com zero, para as barras não "pularem"; com `categoriaId` vem só a escolhida. |
+| `serie` | Linha do tempo **sem lacunas** (dias/semanas/meses sem movimento vêm com 0): `<LineChart>`/`<BarChart>` direto, `dataKey="data"`. Em `semana`, `data` é a segunda-feira; em `mes`, o dia 1. |
 
-Erros: **400** para `periodo`/`agrupamento`/`escopo` fora dos valores, `periodo` junto de datas, data inexistente, `dataInicio` maior que `dataFim`, `categoriaId` não numérico, fuso inválido, parâmetro desconhecido, série com mais de 400 pontos ou `escopo` enviado por solicitante; **401** sem token.
+**Regra do período:** uma solicitação pertence ao período pela **data de criação**, e todos os blocos usam essa mesma coleção. Por isso `sum(serie.criadas) = totais.total` e `sum(porCategoria.total) = totais.total`. `serie.concluidas` conta, dessas solicitações, as concluídas dentro da janela (por data de conclusão); nos presets, que terminam hoje, ela também soma `totais.concluidas`.
+
+**Atenção no `escopo=meus`:** `abertas` é sempre 0, porque um chamado aberto ainda não tem atendente.
+
+**Performance no front:**
+- Uma chamada por mudança de filtro (preset, datas, setor, escopo). Com TanStack Query: `queryKey: ['dashboard', filtros]`, `placeholderData: keepPreviousData` (troca de filtro sem piscar) e `staleTime` curto (~30 s). Invalide `['dashboard']` depois de criar, excluir ou mudar o status de uma solicitação.
+- A resposta traz `Cache-Control: private, no-cache` e `ETag`: o navegador revalida a cada chamada e, se nada mudou, recebe **304** sem corpo (o `fetch` já devolve o conteúdo em cache). Dado nunca fica desatualizado.
+- Clique numa barra de setor pode aplicar `categoriaId`; os botões **Tudo / 30 dias / 7 dias** enviam `periodo`; o seletor de datas envia `dataInicio`/`dataFim` (e deixa de enviar `periodo`).
+
+Erros: **400** para `periodo`/`agrupamento`/`escopo` fora dos valores, `periodo` junto de datas, data inexistente, `dataInicio` maior que `dataFim`, `categoriaId` não numérico, `fuso` inválido, parâmetro desconhecido, série com mais de 400 pontos ou `escopo` enviado por solicitante; **401** sem token.

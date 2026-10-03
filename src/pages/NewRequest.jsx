@@ -4,10 +4,10 @@ import { useApp } from '../context'
 import * as api from '../services/api'
 import { invalidateDashboard } from '../queryClient'
 import { useAction } from '../hooks/useAction'
-import ConfirmModal from '../components/ConfirmModal'
+import Modal from '../components/Modal'
 
 export default function NewRequest() {
-  const { notify } = useApp()
+  const { notify, showError } = useApp()
   const nav = useNavigate()
   const [categories, setCategories] = useState([])
   const [f, setF] = useState({ title: '', categoryId: '', description: '' })
@@ -30,7 +30,7 @@ export default function NewRequest() {
   const dirty = f.title.trim() !== '' || f.description.trim() !== ''
   const allowLeave = useRef(false) // liberado após criar a solicitação com sucesso
 
-  // Bloqueia qualquer saída da tela (menu, Voltar, botão do navegador) e pede confirmação
+  // Bloqueia qualquer saída da tela (menu, logo, Cancelar, botão do navegador) e pede confirmação
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) => dirty && !allowLeave.current && currentLocation.pathname !== nextLocation.pathname,
   )
@@ -68,7 +68,7 @@ export default function NewRequest() {
         notify(`Solicitação #${String(created.id).padStart(4, '0')} criada com sucesso`)
         nav(`/solicitacoes/${created.id}`)
       } catch (err) {
-        setError(err.message)
+        showError('Não foi possível criar a solicitação', err.message)
       }
     })
   }
@@ -142,8 +142,9 @@ export default function NewRequest() {
           <button className="btn primary" disabled={busy || !valid}>{busy ? 'Enviando...' : 'Enviar solicitação'}</button>
         </div>
       </form>
-      <ConfirmModal
+      <Modal
         open={blocker.state === 'blocked'}
+        variant="warning"
         title="Sair sem enviar a solicitação?"
         cancelLabel="Continuar editando"
         confirmLabel="Sair e descartar"
@@ -151,7 +152,7 @@ export default function NewRequest() {
         onConfirm={() => blocker.proceed()}
       >
         Você ainda não enviou esta solicitação. Se sair agora, o que foi preenchido será perdido.
-      </ConfirmModal>
+      </Modal>
     </>
   )
 }
