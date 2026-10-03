@@ -35,3 +35,12 @@ export const dateFromUrl = (s) => {
   const d = new Date(`${s}T00:00:00Z`)
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s ? s : ''
 }
+
+export const COMMENT_MAX = 2000 // mesmo limite da API
+
+export function validateComment(text) {
+  const t = text.trim()
+  if (!t) return 'Escreva uma mensagem.'
+  if (t.length > COMMENT_MAX) return `O comentário deve ter no máximo ${COMMENT_MAX} caracteres.`
+  return ''
+}

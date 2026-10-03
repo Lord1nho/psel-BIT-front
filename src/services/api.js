@@ -139,3 +139,42 @@ export function getDashboard({ periodo, dataInicio, dataFim, categoriaId, agrupa
     },
   })
 }
+
+// ---- Comentários (docs/api.md, seção 11) ----
+const toComment = (c) => ({
+  id: c.id,
+  text: c.texto,
+  createdAt: c.dataCriacao,
+  editedAt: c.dataEdicao,
+  author: { id: c.autor?.id, name: c.autor?.nome, role: c.autor?.perfil },
+})
+
+const COMMENT_PAGE = 50
+
+/** GET /solicitacoes/:codigo/comentarios — `after` é o cursor (só traz comentários posteriores). */
+export async function listComments(id, { after, limit = COMMENT_PAGE } = {}) {
+  const data = await request(`/solicitacoes/${id}/comentarios`, { query: { proxComentario: after, limite: limit } })
+  return { items: data.itens.map(toComment), total: data.total, cursor: data.proxComentario }
+}
+
+/** Conversa inteira: repete com o cursor até vir menos que o limite. */
+export async function listAllComments(id) {
+  let page = await listComments(id)
+  const items = [...page.items]
+  while (page.items.length === COMMENT_PAGE) {
+    page = await listComments(id, { after: page.cursor })
+    items.push(...page.items)
+  }
+  return { items, cursor: page.cursor }
+}
+
+/** POST — como atendente num chamado ABERTO, comentar assume o chamado. */
+export const createComment = async (id, text) =>
+  toComment(await request(`/solicitacoes/${id}/comentarios`, { method: 'POST', body: { texto: text } }))
+
+/** PATCH — só o autor */
+export const updateComment = async (id, commentId, text) =>
+  toComment(await request(`/solicitacoes/${id}/comentarios/${commentId}`, { method: 'PATCH', body: { texto: text } }))
+
+/** DELETE — só o autor; definitivo */
+export const deleteComment = (id, commentId) => request(`/solicitacoes/${id}/comentarios/${commentId}`, { method: 'DELETE' })

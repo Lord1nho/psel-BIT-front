@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, MessageSquare, Circle, Clock, Pencil, Trash2, Ban } from 'lucide-react'
+import { ArrowLeft, Circle, Clock, Pencil, Trash2, Ban } from 'lucide-react'
 import { useApp } from '../context'
 import { STATUS, PRIORITY } from '../data/mock'
 import * as api from '../services/api'
@@ -9,6 +9,7 @@ import { invalidateDashboard } from '../queryClient'
 import { useAction } from '../hooks/useAction'
 import { fmtId, fmtDate, StatusBadge, Avatar } from '../components/Shared'
 import Modal from '../components/Modal'
+import Comments from '../components/Comments'
 import ErrorPage from '../components/ErrorPage'
 import RequestFields from '../components/RequestFields'
 import { cleanLine, cleanText, validateRequest } from '../utils/requestValidation'
@@ -39,6 +40,16 @@ export default function RequestDetail() {
       cancelled = true
     }
   }, [id])
+
+  // recarrega o detalhe (ex.: depois que um comentário assume o chamado) e o dashboard
+  const reload = async () => {
+    try {
+      setR(await api.getRequest(id))
+      invalidateDashboard()
+    } catch {
+      // mantém o que já está na tela
+    }
+  }
 
   if (error)
     return error.status === 404 ? (
@@ -198,12 +209,11 @@ export default function RequestDetail() {
                 </li>
               ))}
             </ol>
-            <div className="comment-form">
-              <textarea rows={3} disabled placeholder="Comentários em breve" />
-              <button className="btn primary" disabled title="Disponível em breve">
-                <MessageSquare size={14} /> Comentar
-              </button>
-            </div>
+          </section>
+
+          <section className="card">
+            <h3>Comentários</h3>
+            <Comments request={r} onRequestChanged={reload} />
           </section>
         </div>
 
