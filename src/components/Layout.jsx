@@ -135,9 +135,6 @@ export default function Layout() {
               <PlusCircle size={16} /> Nova
             </button>
           )}
-          <Link to="/solicitacoes" className="top-brand" aria-label="Portal de Solicitações — ir para a tela inicial">
-            <span className="logo">BIT</span>
-          </Link>
           <div className="user" ref={profileRef} onClick={() => setMenu(!menu)}>
             <Avatar name={user.name} />
             <span className="hide-sm user-info">
