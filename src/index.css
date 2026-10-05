@@ -318,5 +318,5 @@ input.invalid:focus, select.invalid:focus, textarea.invalid:focus { box-shadow: 
 .breadcrumb a:hover { color: var(--navy); text-decoration: underline; }
 .breadcrumb .current span { color: var(--navy); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 640px) { .breadcrumb li:not(.current):not(:nth-last-child(2)) { display: none; } }
-.top-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--navy); text-decoration: none; white-space: nowrap; }
-.top-brand:hover { color: var(--navy); }
+.top-brand { display: inline-flex; align-items: center; text-decoration: none; }
+.top-brand:hover { color: inherit; }

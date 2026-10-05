@@ -137,7 +137,6 @@ export default function Layout() {
           )}
           <Link to="/solicitacoes" className="top-brand" aria-label="Portal de Solicitações — ir para a tela inicial">
             <span className="logo">BIT</span>
-            <span className="hide-sm">Portal de Solicitações</span>
           </Link>
           <div className="user" ref={profileRef} onClick={() => setMenu(!menu)}>
             <Avatar name={user.name} />
