@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useOutlet, useNavigate, useLocation, useNavigationType } from 'react-router-dom'
 import { AnimatePresence, m } from 'motion/react'
-import { LayoutDashboard, Ticket, PlusCircle, Bell, LogOut, Menu, ChevronRight } from 'lucide-react'
+import { LayoutDashboard, Ticket, PlusCircle, LogOut, Menu, ChevronRight } from 'lucide-react'
 import { useApp } from '../context'
 import { ROLES } from '../data/mock'
 import { Avatar, fmtId } from './Shared'
@@ -135,10 +135,10 @@ export default function Layout() {
               <PlusCircle size={16} /> Nova
             </button>
           )}
-          <button className="icon-btn" aria-label="Notificações">
-            <Bell size={20} />
-            <i className="ping" />
-          </button>
+          <Link to="/solicitacoes" className="top-brand" aria-label="Portal de Solicitações — ir para a tela inicial">
+            <span className="logo">BIT</span>
+            <span className="hide-sm">Portal de Solicitações</span>
+          </Link>
           <div className="user" ref={profileRef} onClick={() => setMenu(!menu)}>
             <Avatar name={user.name} />
             <span className="hide-sm user-info">

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Circle, Clock, Pencil, Trash2, Ban } from 'lucide-react'
+import { ArrowLeft, Circle, Pencil, Trash2, Ban } from 'lucide-react'
 import { useApp } from '../context'
-import { STATUS, PRIORITY } from '../data/mock'
+import { STATUS } from '../data/mock'
 import * as api from '../services/api'
 import { useCategories } from '../hooks/useCategories'
 import { invalidateDashboard } from '../queryClient'
@@ -249,13 +249,6 @@ export default function RequestDetail() {
               {busy ? 'Salvando...' : 'Salvar status'}
             </button>
           )}
-          <label className="field">
-            Prioridade
-            <select disabled value="" title="Disponível em breve">
-              <option value="">Não informada</option>
-              {Object.entries(PRIORITY).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}
-            </select>
-          </label>
           <div className="field">
             Responsável
             {r.assignee ? (
@@ -272,8 +265,6 @@ export default function RequestDetail() {
             <dd className="row"><Avatar name={r.requester || '?'} size={24} /> {r.requester}</dd>
             <dt>Criada em</dt>
             <dd>{fmtDate(r.createdAt)}</dd>
-            <dt>SLA</dt>
-            <dd className="row"><Clock size={14} /> {r.status === 'CONCLUIDO' ? 'Encerrada' : 'Resposta em 4h'}</dd>
           </dl>
         </aside>
       </div>

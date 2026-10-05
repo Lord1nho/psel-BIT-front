@@ -1,7 +1,7 @@
 // Limites e validações dos campos de texto. O servidor é quem garante as regras; aqui evitamos enviar
 // o que ele rejeitaria (ou, pior, o que quebra com erro 500) e damos retorno imediato ao usuário.
 export const TITLE_MAX = 255 // mesmo limite da API
-export const DESCRIPTION_MAX = 5000 // a API só limita o corpo (~100 KB); este é um teto de uso
+export const DESCRIPTION_MAX = 3500 // mesmo limite da API
 export const SEARCH_MAX = 100 // mesmo limite da API para `q`
 export const LOGIN_MAX = 255
 
